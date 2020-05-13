@@ -5,13 +5,15 @@
     "dirty" : false,
     "encoding" : "UTF-8",
     "folds" : "",
-    "hash" : "3271220903",
+    "hash" : "1133855158",
     "id" : "74E4468D",
-    "lastKnownWriteTime" : 1589400658,
-    "last_content_update" : 1589400658,
+    "lastKnownWriteTime" : 1589401952,
+    "last_content_update" : 1589401952019,
     "path" : "~/R/SDS348/TestProject3/config.toml",
     "project_path" : "config.toml",
     "properties" : {
+        "cursorPosition" : "40,23",
+        "scrollLine" : "24"
     },
     "read_only" : false,
     "read_only_alternatives" : [
