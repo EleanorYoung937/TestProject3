@@ -5,14 +5,14 @@
     "dirty" : false,
     "encoding" : "UTF-8",
     "folds" : "",
-    "hash" : "3604697891",
+    "hash" : "0",
     "id" : "61C9486A",
-    "lastKnownWriteTime" : 1589402671,
-    "last_content_update" : 1589402671903,
+    "lastKnownWriteTime" : 1589402969,
+    "last_content_update" : 1589402969677,
     "path" : "~/R/SDS348/TestProject3/content/projects.md",
     "project_path" : "content/projects.md",
     "properties" : {
-        "cursorPosition" : "22,67",
+        "cursorPosition" : "10,88",
         "scrollLine" : "3"
     },
     "read_only" : false,
