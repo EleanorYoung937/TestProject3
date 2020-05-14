@@ -1,0 +1,366 @@
+---
+title: "Project2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, fig.align="center", fig.height=5, fig.width=8, tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+My primary source of data is the 2015 Human Data Report, which I accessed through Kaggle. It measures the following variables for each country: Human Development Index (HDI), Life Expectancy at Birth, Expected Years of Education, Mean Years of Education, Gross National Income (GNI) per Capita. I also included the happiness score for each country from the 2017 World Happiness Report, which I also accessed through Kaggle. All of these are numerical data.
+The catagorical variables were pulled individually from the World Bank Data Catalog and are binary (0 = no, 1 = yes) responses to the questions: "Nonpregnant and nonnursing women can do the same jobs as men" (variable:job) which was answered via surveys to gauge social attitudes in each country and "Nondiscrimination clause mentions gender in the constitution" (variable:clause) which could be assesed by the country's constitution. There is also a dataset from the World Bank Data Catalog that included variables that splits countries into the catagories of low-, medium-, and high-income level (variable:income) and region of the world (variable:region) I ultimately decided to drop the clause variable because there was not enough overlap in the countries surveyed with job, which had more observations.
+My response variable is whether or not the country has had a female head of state in the last 50 years, or since 1970. The source of this data is Wikipedia (not great, I know). I had found the exact same data from a different source but when I realized the site wanted me to pay 30 dollars for access, I opted to scrape the data from Wikipedia.
+
+```{r}
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(plotROC)
+#install.packages("glmnet")
+library(glmnet)
+```
+
+```{r}
+happiness_data <- read.csv("2017.csv") %>%
+  drop_na() %>%
+  select(Country, HappinessScore) %>%
+  separate(Country, sep = ",", c("Country", NA))# %>%
+  #separate(Country, sep = "[(]", c("Country", NA))
+
+job_data <- read.csv("data2.csv") #%>%
+colnames <- job_data %>% colnames
+job_data <- job_data %>%
+  drop_na() %>%
+  select(colnames[1], Country.Code, job) %>%
+  rename(Country = colnames[1]) %>% 
+  separate(Country, sep = "[(]", c("Country", NA))# %>%
+  #separate(Country, sep = ",", c("Country", NA))
+
+income_data <- read.csv("data3.csv") #%>%
+colnames <- income_data %>% colnames
+income_data <- income_data %>%
+  drop_na() %>% 
+  rename(Country.Code = colnames[1])%>%
+  separate(Country, sep = ",", c("Country", NA)) #%>%
+  #separate(Country, sep = "[(]", c("Country", NA))
+
+response <- read.csv("response.csv") #%>% 
+colnames <- response %>% colnames
+response <- response %>%
+  rename(Country = colnames[1])
+
+hd_data <- read.csv("human_development.csv") %>%
+  separate(Country, sep = ",", c("Country", NA))# %>%
+  #separate(Country, sep = "[(]", c("Country", NA))
+```
+
+I joined all the data together and counted the responses to the categorical features Region and Income Group: 7 and 4 respectively. I also added the response variable: whether or not there had been a female head of state in the last 50 years. There are 131 observations in the combined dataset.
+
+```{r}
+data <- income_data %>% 
+  full_join(job_data) %>% 
+  full_join(hd_data) %>%
+  full_join(happiness_data) %>%
+  drop_na() %>%
+  mutate(GNIperCaptia = as.numeric(GNIperCaptia))%>%
+  mutate(FemaLeader = (ifelse(Country %in% response$Country, 1, 0))) %>%
+  mutate(FemaLeader = factor(FemaLeader, levels = c("0", "1"))) %>%
+  mutate(job = factor(job, levels = c("0", "1")))
+n_distinct(data$Region)
+n_distinct(data$IncomeGroup)
+length(data$Country.Code)
+```
+
+I performed a mean difference randomization test on female leadership (binary response of 1/0) to every numeric variable: HDI, LifeExpectancy, ExpectedEducation, MeanEducation, and HappinessScore.
+
+HDI Hypothesis
+  Null: HDI is the same for countries with previous female leadership vs. without.
+  Alternative: HDI is not the same for countries with previous female leadership vs. without.
+LifeExpectancy Hypothesis
+  Null: LifeExpectancy is the same for countries with previous female leadership vs. without.
+  Alternative: LifeExpectancy is not the same for countries with previous female leadership vs. without.
+ExpectedEducation Hypothesis
+  Null: ExpectedEducation is the same for countries with previous female leadership vs. without.
+  Alternative: ExpectedEducation is not the same for countries with previous female leadership vs.
+  without.
+MeanEducation Hypothesis
+  Null: MeanEducation is the same for countries with previous female leadership vs. without.
+  Alternative: MeanEducation is not the same for countries with previous female leadership vs. without.
+HappinessScore Hypothesis
+  Null: HappinessScore is the same for countries with previous female leadership vs. without.
+  Alternative: HappinessScore is not the same for countries with previous female leadership vs.
+  without.
+
+Using the mean differences of 5000 randomized samples from the dataset, I found that less than 0.05 of these were more extreme than either the difference between ExpectedEducation or LifeExpectancy for countries that had vs coutries that had not had a female leader. This means the null distribution can be rejected for these two variables and we can conlude there is significant evidence for a difference between the LifeExpectancy and ExpectedEducation of these two groups.
+
+```{r}
+#mean difference for randomization with a catagorical and a numeric variable
+set.seed(348)
+distHDI<-vector()
+distLifeExpectancy<-vector()
+distExpectedEducation<-vector()
+distMeanEducation<-vector()
+distHappinessScore<-vector()
+for(i in 1:5000){
+new<-data.frame(FemaLeader=data$FemaLeader,
+                HDI=sample(data$HDI),
+                LifeExpectancy=sample(data$LifeExpectancy),
+                ExpectedEducation=sample(data$ExpectedEducation),
+                MeanEducation=sample(data$MeanEducation),
+                HappinessScore=sample(data$HappinessScore)) 
+distHDI[i]<- new %>% group_by(FemaLeader)%>% summarize(means=mean(HDI)) %>% pull(means) %>% diff
+distLifeExpectancy[i]<- new %>% group_by(FemaLeader)%>% summarize(means=mean(LifeExpectancy)) %>% pull(means) %>% diff
+distExpectedEducation[i]<- new %>% group_by(FemaLeader)%>% summarize(means=mean(ExpectedEducation)) %>% pull(means) %>% diff
+distMeanEducation[i]<- new %>% group_by(FemaLeader)%>% summarize(means=mean(MeanEducation)) %>% pull(means) %>% diff
+distHappinessScore[i]<- new %>% group_by(FemaLeader)%>% summarize(means=mean(HappinessScore)) %>% pull(means) %>% diff
+}
+
+```
+
+```{r}
+HDI_dif <- data %>% group_by(FemaLeader)%>% summarize(means=mean(HDI)) %>% pull(means) %>% diff
+LifeExpectancy_dif <- data %>% group_by(FemaLeader)%>% summarize(means=mean(LifeExpectancy)) %>% pull(means) %>% diff
+ExpectedEducation_dif <- data %>% group_by(FemaLeader)%>% summarize(means=mean(ExpectedEducation)) %>% pull(means) %>% diff
+MeanEducation_dif <- data %>% group_by(FemaLeader)%>% summarize(means=mean(MeanEducation)) %>% pull(means) %>% diff
+HappinessScore_dif <- data %>% group_by(FemaLeader)%>% summarize(means=mean(HappinessScore)) %>% pull(means) %>% diff
+
+print("HDI:")
+mean(distHDI< -HDI_dif | distHDI> HDI_dif)
+{hist(distHDI,main="",ylab=""); abline(v = HDI_dif,col="red")}
+print("LifeExpectancy")
+mean(distLifeExpectancy< -LifeExpectancy_dif | distLifeExpectancy> LifeExpectancy_dif)
+{hist(distLifeExpectancy,main="",ylab=""); abline(v = LifeExpectancy_dif,col="red")}
+print("ExpectedEducation")
+mean(distExpectedEducation< -ExpectedEducation_dif | distExpectedEducation> ExpectedEducation_dif)
+{hist(distExpectedEducation,main="",ylab=""); abline(v = ExpectedEducation_dif,col="red")}
+print("MeanEducation")
+mean(distMeanEducation< -MeanEducation_dif | distMeanEducation> MeanEducation_dif)
+{hist(distMeanEducation,main="",ylab=""); abline(v = MeanEducation_dif,col="red")}
+print("HappinessScore")
+mean(distHappinessScore< -HappinessScore_dif | distHappinessScore> HappinessScore_dif)
+{hist(distHappinessScore,main="",ylab=""); abline(v = HappinessScore_dif,col="red")}
+```
+
+The MANOVA shows significant results (F-stat = 3.3541, p-value = 0.007068) which means that at least one variable is significantly different between the countries who have had female leaders and those who have not. Ad-hoc ANOVAs show that all LifeExpectancy and ExpectedEducation differ by whether or not countries have had female leadership (LifeExpectancy: F = 5.1634, p = 0.02472; ExpectedEducation: F = 6.4317 , p = 0.0124). For 8 tests there is a 0.3365796 probability of a type-1 error and the adjusted error rate should be 0.00625. This new value would lead to a rejection of the MANOVA meaning that none of the variables are significantly different between the two groups. However, the data did not meet the assumptions of the tests we used. It likely does not have equal variance, covariance or multivariate normality, all of which are assumptions of MANOVA, ANOVA, and/or the T-Test. It fails tests of univariate normality for several of these variables. This weakens these tests and makes our results less certain.
+
+```{r}
+#catagorical variables: cbind(job, Region, IncomeGroup)
+shapiro.test(data$HDI)
+shapiro.test(data$LifeExpectancy)
+shapiro.test(data$ExpectedEducation)
+shapiro.test(data$MeanEducation)
+shapiro.test(data$HappinessScore)
+
+print("******MANOVA******")
+
+awman <- manova(cbind(HDI,LifeExpectancy,ExpectedEducation,MeanEducation,HappinessScore)~FemaLeader, data=data)
+summary(awman)
+
+print("******ANOVAS******")
+
+summary.aov(awman)
+
+print("******T-Tests******")
+
+pairwise.t.test(data$LifeExpectancy, data$FemaLeader)
+pairwise.t.test(data$ExpectedEducation, data$FemaLeader)
+
+print("Probability of a Type-1 error:")
+1 - (.95^8)
+print("Corrected Significance Value:")
+.05/8
+```
+
+I constructed a linear model using LifeExpectancy and the public perception of whether or not a woman can perform a man's job (job) to predict HappinessScore. I mean centered both LifeExpectancy and HappinessScore for this analysis. When the KS and BP tests are run on the linear model, both fail to reject the null (p > 0.05) meaning the data has a normal distribtution and is homoskedastic.Though the histogram of residuals has a lower value in the middle, the residuals plot shows an even distribution and a fit line is horizontal, meaning the data is linear.
+
+LifeExpectany is significant (p < 0.05), as is the interaction between LifeExpectany and job (p=0.00104). Because job is not significant (p=0.85619), this is called a cross-over interaction, as seen in the plot, where the slope of the two lines cross. Countries that answered "Yes" (1) to the survey question have, on when LifeExpectancy is constant, a 0.021812 unit lower happiness score. Holding the survey question, job, constant, every additional year of life expectancy is a 0.089720 increase in the happiness score. When the survey question, job, is 1, there is an additional increase of 0.046497 with every additional year of life expectancy. The model with Robust SEs shows the same results. This model is responsible for 69% for the total variation.
+
+job1                 -0.021812   0.120110  -0.182  0.85619    
+LifeExpectancyC       0.089720   0.008708  10.303  < 2e-16 ***
+job1:LifeExpectancyC  0.046497
+
+Assumption Checking Resource: http://www.sthda.com/english/articles/39-regression-model-diagnostics/161-linear-regression-assumptions-and-diagnostics-in-r-essentials/
+Cross-Over Interaction: https://www.theanalysisfactor.com/interactions-main-effects-not-significant/
+
+```{r}
+data$HappinessScoreC <- data$HappinessScore - mean(data$HappinessScore, na.rm = T)
+data$LifeExpectancyC <- data$LifeExpectancy - mean(data$LifeExpectancy, na.rm = T)
+
+model<- lm(HappinessScoreC~job*LifeExpectancyC, data=data)
+
+#Linear Relationship: Scatter Plot
+ggplot(data,aes(x=LifeExpectancyC, y=HappinessScoreC,color=job))+geom_point()+theme_classic()
+#Independent Observations
+#Normal Distribution: Histogram, KS or SW test
+resids <- model$residuals
+ggplot() +
+  geom_histogram(aes(resids),bins=10) +
+  theme_classic()
+ks.test(resids, "pnorm", mean=0, sd(resids)) 
+#Equal Variance (homoskedasticity): residuals vs y-hat and bp test
+fitvals <- model$fitted.values
+ggplot() +
+  geom_point(aes(fitvals,resids)) +
+  theme_classic() +
+  geom_hline(yintercept=0, color='red')
+bptest(model)
+
+summary(model)
+ggplot(aes(x=LifeExpectancyC, y=HappinessScoreC,group=job), data = data)+
+  geom_point(aes(color=job))+
+  geom_smooth(method="lm",se=F,fullrange=T,aes(color=job))+
+  theme_classic() +
+  ylab("Centered Happiness Score") +
+  xlab("Centered Life Expectancy") +
+  ggtitle("Using Different Countrys's Life Expectancy to Predict Happiness",
+          subtitle = "Seperated by Social Perception of Women's Ability to Perform the Same Job as Men") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  NULL
+
+coeftest(model, vcov = vcovHC(model))
+
+(sum((data$HappinessScore-mean(data$HappinessScore))^2)-sum(model$residuals^2))/sum((data$HappinessScore-mean(data$HappinessScore))^2)
+```
+
+The bootstrapped SE are very simular to that of the normal model, which is to be expected because the data is normal and homoskedastic. A confidence interval that contains 0 mean that "null" is within the confidence limits and therefore cannot be rejected (p>0.05). This is the case for job, but not LifeExpectancy or the interaction of LifeExpectancy and job (p<0.05). This is the same result as with the non-bootstrapped model.
+
+```{r}
+summary(model)
+samp_distn<-replicate(5000, {  
+  boot <- sample_frac(data, replace=T)
+  fit <- lm(HappinessScoreC~job*LifeExpectancyC, data=boot)
+  coef(fit)})
+samp_distn %>% t %>% as.data.frame %>% summarize_all(sd)
+samp_distn %>% t %>% as.data.frame %>% gather %>% group_by(key) %>% summarize(lower=quantile(value,.025), upper=quantile(value,.975))
+```
+
+```{r}
+class_diag<-function(probs,truth){
+  
+  tab<-table(factor(probs>.5,levels=c("FALSE","TRUE")),truth)
+  acc=sum(diag(tab))/sum(tab)
+  sens=tab[2,2]/colSums(tab)[2]
+  spec=tab[1,1]/colSums(tab)[1]
+  ppv=tab[2,2]/rowSums(tab)[2]
+
+  if(is.numeric(truth)==FALSE & is.logical(truth)==FALSE) truth<-as.numeric(truth)-1
+  
+  #CALCULATE EXACT AUC
+  ord<-order(probs, decreasing=TRUE)
+  probs <- probs[ord]; truth <- truth[ord]
+  
+  TPR=cumsum(truth)/max(1,sum(truth)) 
+  FPR=cumsum(!truth)/max(1,sum(!truth))
+  
+  dup<-c(probs[-1]>=probs[-length(probs)], FALSE)
+  TPR<-c(0,TPR[!dup],1); FPR<-c(0,FPR[!dup],1)
+  
+  n <- length(TPR)
+  auc<- sum( ((TPR[-1]+TPR[-n])/2) * (FPR[-1]-FPR[-n]) )
+
+  data.frame(acc,sens,spec,ppv,auc)
+}
+```
+
+Before cross validation, the model is 0.7099237 accurate; the recall is 0.6944444, sensitivity is 0.7575758, and specificity of this model is 0.6615385. The AUC is 0.7724942. Out of the significant predictors I am reporting them as Variable: X, where X is the increase in log-odds for every one unit increase in the variable, while holding all others constant. The significant predictors (p<0.05) are RegionEurope & Central Asia: -2.175, RegionMiddle East & North Africa: -3.039, HDI: -2.782e+01, LifeExpectancy: 2.438e-01, ExpectedEducation: 5.903e-01, MeanEducation: 0.491960. AUC is a calculation of how well we are predicting our response variable. The AUC demonstrated by the AUC graph is 0.7724942, but, as demonstrated in the large area of overlap in the density plot, the model cannot correctly predict each response. The cross validatated model sees a decress to an AUC of 0.6138492 and an accuracy of 0.5945055. The recall is 0.5754762, the sensitivity is 0.6462698, and the specificity is 0.5497619. This reduction means that the model is overfitting when it consideres every single variable. 
+
+```{r}
+print("number of countries with no female leaders (last 50 years):")
+data%>%filter(FemaLeader == 0)%>%count%>%pull
+print("number of countries with one or more female leaders (last 50 years):")
+data%>%filter(FemaLeader == 1)%>%count%>%pull
+
+glm_data <- data %>% select(-c("Country", "Country.Code", "HappinessScoreC","LifeExpectancyC")) %>% mutate(FemaLeader = ifelse(FemaLeader == 1, TRUE, FALSE) )
+
+fit<-glm(FemaLeader~., data = glm_data, family="binomial")
+prob<-predict(fit, glm_data, type="response") 
+pred<-ifelse(prob>.50,1,0)
+class_diag(prob,glm_data$FemaLeader)
+summary(fit)
+coef(fit)%>%exp%>%data.frame
+table(predicted = factor( prob > .5,levels = c("FALSE", "TRUE")), actual = glm_data$FemaLeader)%>%addmargins
+
+ROC <- glm_data %>% ggplot()+
+  geom_roc(aes(d = FemaLeader, m = prob), n.cuts=0)+
+  geom_segment(aes(x=0,xend=1,y=0,yend=1),lty=2) +
+  theme_bw()
+ROC
+calc_auc(ROC)
+
+logit<-predict(fit,type="link")
+glm_data %>% ggplot() +
+  geom_density(aes(logit,color=FemaLeader,fill=FemaLeader), alpha=.4)+
+  theme(legend.position=c(.85,.85)) +
+  theme_bw() +
+  geom_vline(xintercept=0)+xlab("predictor (logit)")
+
+set.seed(1234)
+k=10 #number of folds
+glm_data<-glm_data[sample(nrow(glm_data)),] #mix up the data to break any patterns between samples
+folds<-cut(seq(1:nrow(glm_data)),breaks=k,labels=F) #create folds (subsets)
+diags<-NULL #null vector
+for(i in 1:k){ #inerate through so each fold is "test" at some point
+  train<-glm_data[folds!=i,] #training data set
+  test<-glm_data[folds==i,] #validation data set
+  truth<-test$FemaLeader #actual labels of the test data
+  fit<-glm(FemaLeader~.,data=train,family="binomial") #fit a linear model
+  probs<-predict(fit,newdata = test,type="response") #find probabilities of "True" for each sample in the test data using the linear model
+  diags<-rbind(diags,class_diag(probs,truth)) #stores the model statistics for each ineration
+}
+
+summarize_all(diags,mean) #mean satitstics of the k-fold model
+```
+
+None of the variables had non-zero coefficient values from the lasso regression with either lambda.1se or lamda.min as a response.Therefore I used the variables that were found to be significant predictors in the model that considered all variables but no interactions. The model has an AUC of 0.7298368 while the cross-validated model has an AUC of 0.7066667. There is still overfitting but it is much less extreme.The accuracy is 0.648855 and 0.6027473, respectively. This is an improvement on the cross-fit accuracy of 0.5945055 for the linear model that included every variable.
+
+glmnet reference: https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html#log
+
+```{r}
+set.seed(1234)
+y<-as.matrix(glm_data$FemaLeader) #make response matrix
+x<-model.matrix(FemaLeader~-1+.,data=glm_data)[,-1] #make predictor matrix
+x<-scale(x) #scale predictors
+
+cv<-cv.glmnet(x,y,family="binomial") #makes a cross validated linear model
+{plot(cv$glmnet.fit, "lambda", label=TRUE); abline(v = log(cv$lambda.1se)); abline(v = log(cv$lambda.min),lty=2)}
+plot(cv)
+
+lasso<-glmnet(x,y,family="binomial",lambda=cv$lambda.min) #make a penalty based on the lamda function
+coef(lasso) #returns the reduced model
+lasso<-glmnet(x,y,family="binomial",lambda=cv$lambda.1se)
+coef(lasso)
+#he significant predictors (p<0.05) are RegionEurope & Central Asia: -2.175, RegionMiddle East & North Africa: -3.039, HDI: -2.782e+01, LifeExpectancy: 2.438e-01, ExpectedEducation: 5.903e-01
+glm_data2 <- glm_data %>% 
+  mutate(R_ECA = ifelse(Region == "Europe & Central Asia", 1, 0) ) %>%
+  mutate(R_MENA = ifelse(Region == "Middle East & North Africa", 1, 0))
+
+fit2<-glm(FemaLeader~R_ECA+R_MENA+HDI+LifeExpectancy+ExpectedEducation+MeanEducation, data = glm_data2, family="binomial")
+prob2<-predict(fit2,type="response")
+class_diag(prob2,glm_data2$FemaLeader)
+table(predicted = factor(prob2 > .5, levels=c("FALSE","TRUE")), actual = glm_data2$FemaLeader) %>% addmargins
+
+set.seed(1234)
+k=10 #number of folds
+glm_data2<-glm_data2[sample(nrow(glm_data)),] #mix up the data to break any patterns between samples
+folds<-cut(seq(1:nrow(glm_data2)),breaks=k,labels=F) #create folds (subsets)
+diags<-NULL #null vector
+for(i in 1:k){ #inerate through so each fold is "test" at some point
+  train<-glm_data2[folds!=i,] #training data set
+  test<-glm_data2[folds==i,] #validation data set
+  truth<-test$FemaLeader #actual labels of the test data
+  fit<-glm(FemaLeader~R_ECA+R_MENA+HDI+LifeExpectancy+ExpectedEducation+MeanEducation,data=train,family="binomial") #fit a linear model
+  probs<-predict(fit,newdata = test,type="response") #find probabilities of "True" for each sample in the test data using the linear model
+  diags<-rbind(diags,class_diag(probs,truth)) #stores the model statistics for each ineration
+}
+summarize_all(diags,mean) 
+```
+
+```{r}
+
+```
+
+```{r}
+
+```

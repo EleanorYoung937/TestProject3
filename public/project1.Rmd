@@ -1,0 +1,230 @@
+---
+title: "SDS348 project 1"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, fig.align="center", fig.height=5, fig.width=8, tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+## R Markdown
+
+Introduction:
+  I am incredibly interested in sustainibility, as I will witness the major effects of climate change in my life time. I chose the first datasets to investigate dietary choice by region and the co2 emmissions their production is responsible for. The dataset is from the tidytuesday github run by the rfordatascience group. The dataset countains varaibles specifying the country and type of food, as well as the consumption rate in units of kg/person/year and the rate of emmisions in units of CO2/person/year. The second dataset is a list of countries and their projected populations for each year from 2020 to 2050. The dataset is from The World Bank's data bank. I will use these to calculate total consumption and emmissions for each year.
+Additionally, I am looking for correlation between population size and rates of consumption and emmission. I hypothesize that a country with more people may need to consume less or at a lower co2 emmissions rate than a smaller one. I approached this project with a focus on calculation and not prediction, and I am realizing that too late to correct my mistake. If I could do it again I would try to predict consumption and emmission using a country's gdp or gdp per person.
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+food_consumption_data <- read.csv("food_consumption.csv")
+population_growth_data <- read.csv("population_data.csv")
+head(food_consumption_data)
+head(population_growth_data)
+```
+
+I had to rename Country.Name to Country in the population growth dataset because it included a strange character that made it hard to call. Additionally, I had to write a function to rename the year labels for the columns to make them understandable. Then I removed extraneous columns that were not useful. I then used pivot_longer so I could join it with food_consumption data, which was already tidy. I used pivot_longer and pivot_wider on this dataset to demonstrate them.
+
+refrence for renaming columns: https://honingds.com/blog/dplyr-rename/
+refrence for substring function: http://rfunction.com/archives/1692
+refrence for str_replace function: https://www.rdocumentation.org/packages/stringr/versions/1.4.0/topics/str_replace
+refrence for rename troubleshooting: https://stackoverflow.com/questions/26371279/dplyr-0-3-0-2-rename-idiom-unstable-when-reshape-package-is-loaded
+```{r}
+renameX <- function(X)(str_replace(X, X, substring(X, 2, 5)))
+colnames <- population_growth_data %>% colnames
+population_growth_data <- population_growth_data %>%
+  dplyr::rename(Country = colnames[1]) %>%
+  rename_at(vars(starts_with("X")), renameX) %>%
+  select(-contains("."))
+
+  head(population_growth_data)
+```
+
+```{r}
+population_growth_data <- population_growth_data %>%
+  pivot_longer(-c("Country"), names_to = "Year", values_to = "Population")
+head(population_growth_data)
+
+food_consumption_data %>%
+  pivot_wider(names_from = "food_category", values_from = c("consumption", "co2_emmission")) %>%
+  pivot_longer(-c("country"), names_to = "food_category", values_to = "value") %>%
+  separate(food_category,into = c("metric","food_category"), sep="_") %>%
+  glimpse()
+  #pivot_wider(names_from = "metric", values_from = "temp")
+  
+```
+I joined by country, because it is the common variable in my two datasets. I preformed an innerjoin to elimante the values the two datasets did not share. There were 262 countries in the population prediction dataset and 130 in the food consumption dataset. 116 of these countries were shared by the two datasets. Because there are still 116 countries in the combined sample set, I do not expect to be limited by sampling size and think this is still representative of the world population.
+
+```{r}
+data <- inner_join(population_growth_data, food_consumption_data, c("Country" = "country"))
+head(data)
+length(unique(population_growth_data$Country))
+length(unique(food_consumption_data$country))
+length(intersect((unique(population_growth_data$Country)), (unique(food_consumption_data$country))))
+#anti_join(population_growth_data, food_consumption_data, c("Country" = "country")) %>% select(Country) %>% unique()
+```
+I made the variable decade, so I could categorize data by the decade. Then I had to force all the numeric variables I had to be numeric and not factors. Then I calculated total emmissions and consumtions for each country, each year. I calculated summary statistics 25th percentile, minimum ,75th percentile, maximum, mean, and standard deiveation for each food category's rate and total cosumption and co2 emmissions for the year 2020. This is our origin point for these predictions. I then calculated the total co2 emmissions and consumption of each country, by decade. I did this because it naos the change over time, and I will use the stats in graphs later on.
+Lastly, I calculated the mean, median, and standard deviation for the rate and total co2, then consumtion, sepertly. I ordered each by rate to see which countries consume the most and which produce their food most inefficiently. Finland consumes the most and all of the top 10 consumers are European. On the other hand, Argentina is the most inefficient in terms of how much CO2 it produces. The top 10 are not all from the same region. Further analysis is necessay, but these regions may be the more beef and pork reliant countries.
+ 
+case_when reference: https://dplyr.tidyverse.org/reference/case_when.html
+select using indexes reference: https://www.datanovia.com/en/lessons/select-data-frame-columns-in-r/
+changing factor to numeric reference: https://www.dummies.com/programming/r/how-to-convert-a-factor-in-r/
+summary statistics table reference: https://stackoverflow.com/questions/34594641/dplyr-summary-table-for-multiple-variables
+```{r}
+#count na function
+countna <- function(x)sum(is.na(x))
+
+# add catagorical variable: decade
+makedecade <- function(X){
+  case_when(
+  substring(X, 3, 3) == 1 ~ 2010,
+  substring(X, 3, 3) == 2 ~ 2020,
+  substring(X, 3, 3) == 3 ~ 2030,
+  substring(X, 3, 3) == 4 ~ 2040,
+  substring(X, 3, 3) == 5 ~ 2050
+  )
+}
+data <- data %>% mutate(Decade = makedecade(Year))
+
+#make sure all "numeric" variables are really numeric
+data <- data %>% 
+  mutate_at(vars(2,5,6), as.numeric) %>%
+  mutate(Population = as.numeric(as.character(Population))) %>%
+  glimpse()
+
+#make total consumption and total co2 variables
+data <- data %>% mutate(
+  #Population = as.numeric(as.character(Population)),
+  total_consumption = consumption * Population,
+  total_co2 = co2_emmission * Population) %>%
+  dplyr::rename(rate_consumption = consumption, 
+                rate_co2 = co2_emmission)
+
+countna(data$total_co2)
+countna(data$total_consumption)
+length(data$total_co2)
+length(data$total_consumption)
+
+# filter goes by rows
+# select goes by column
+
+data2 <- data %>% 
+  group_by(food_category) %>%
+  filter(Year == "2020") %>%
+  drop_na() %>%
+  select(rate_co2, total_co2) %>% 
+  summarise_each(funs(min = min, 
+                      q25 = quantile(., 0.25), 
+                      median = median, 
+                      q75 = quantile(., 0.75), 
+                      max = max,
+                      mean = mean, 
+                      sd = sd))
+
+data3 <- data %>%
+  drop_na() %>%
+  group_by(Country, Decade) %>%
+  select(total_consumption, rate_consumption, total_co2, rate_co2) %>%
+  summarise_each(funs(sum = sum))
+
+data4 <- data %>%
+  drop_na() %>%
+  group_by(Country) %>%
+  select(rate_consumption, total_consumption) %>%
+  summarise_each(funs(median = median, 
+                      mean = mean, 
+                      sd = sd)) %>%
+  arrange(desc(rate_consumption_mean))
+
+data5 <- data %>%
+  drop_na() %>%
+  group_by(Country) %>%
+  select(rate_co2, total_co2) %>%
+  summarise_each(funs(median = median, 
+                      mean = mean, 
+                      sd = sd)) %>%
+  arrange(desc(rate_co2_mean))
+
+print(data2)
+print(data3)
+print(data4)
+print(data5)
+```
+The strongest correlations are between the total co2 and total consumption variables and the variables used to calculate them. It is unsurprising that these variables are correlated. Interestingly, there appears to be no correlation between rate of co2 emmissions or rate of consumption. Countries with more people did not consume less, or more efficiently than smaller ones, or vice versa.
+```{r}
+df<-data%>%na.omit%>%select_if(is.numeric)%>%select(-c("Decade"))
+cor(df)
+tidycor<-cor(df)%>%
+  as.data.frame%>%
+  rownames_to_column%>%
+  pivot_longer(-1,names_to="name",values_to="correlation")
+head(tidycor)
+tidycor%>%ggplot(aes(rowname,name,fill=correlation))+  geom_tile()+  scale_fill_gradient2(low="red",mid="white",high="blue")+
+  geom_text(aes(label=round(correlation,2)),color = "black", size = 4)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ 
+  coord_fixed()
+```
+
+```{r}
+#graph showing each country's percentage food category from total consumption
+#graph showing total consumption or co2 over year for the top 5 or 10
+#boxplot of consumption and co2 rate in the year 2020, facet by food category
+
+temp <- data %>% group_by(Country) %>% summarise(
+  sum = sum(total_consumption)) %>%
+  arrange(desc(sum)) %>%
+  pull(Country)
+data%>% group_by(Country) %>% filter(Year == 2020) %>% filter(Country %in% temp[1:10]) %>%
+  ggplot(aes(x = Country, y = total_consumption)) +
+  geom_bar(stat = "identity", aes(fill = food_category)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1))
+  
+temp <- data %>% group_by(Country) %>% 
+  summarise(sum = sum(rate_consumption)) %>%
+  arrange(desc(sum)) %>%
+  pull(Country)
+data%>% group_by(Country) %>% filter(Year == 2020) %>% filter(Country %in% temp[1:10]) %>%
+  ggplot(aes(x = Country, y = total_consumption)) +
+  geom_bar(stat = "identity", aes(fill = food_category)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1))
+
+```
+
+India is the highest for PCA1 and PCA2, while Finland is the lowest for PCA1 and Barbados and Granada are the lowest. On the graph the rates of co2 and consumption have the smallest angles, meaning they have a high negative correlation with PCA1. Year has the smallest angle from the Y-axis, meaning it has the highest correlation with PCA2. Population is more strongly correlated with PCA2 than PCA1.
+```{r}
+data <- data %>% drop_na() %>%  mutate(name = paste(Country, Year, food_category, sep = " ")) 
+  #unite(name, c("Country", "Year", "food_category"))
+data6<-data%>%select_if(is.numeric)%>%select(-contains("total"), -Decade)%>%scale
+rownames(data6)<- data$name
+pca<-princomp(data6)
+summary(pca, loadings=T)
+eigval<-pca$sdev^2
+varprop=round(eigval/sum(eigval),2)
+ggplot()+
+  geom_bar(aes(y=varprop,x=1:4),stat="identity")+
+  xlab("")+
+  geom_path(aes(y=varprop, x = 1:4))+
+  geom_text(aes(x=1:4,y=varprop,label=round(varprop,2)),vjust=1,col="white",size=5)+
+  scale_y_continuous(breaks=seq(0,.6,.2),labels = scales::percent)+
+  scale_x_continuous(breaks=1:10)
+data6df<-data.frame(PC1=pca$scores[,1], PC2=pca$scores[,2])
+ggplot(data6df,aes(PC1, PC2))+geom_point()
+Name<-data$name
+pca$scores%>%as.data.frame%>%cbind(Name,.)%>%top_n(3,Comp.1)
+pca$scores%>%as.data.frame%>%cbind(Name,.)%>%top_n(3,wt=desc(Comp.1)) 
+pca$scores%>%as.data.frame%>%cbind(Name,.)%>%top_n(3,wt=Comp.2)
+pca$scores%>%as.data.frame%>%cbind(Name,.)%>%top_n(3,wt=desc(Comp.2))
+pca$loadings[1:4,1:2]%>%as.data.frame%>%rownames_to_column%>%
+  ggplot()+geom_hline(aes(yintercept=0),lty=2)+
+  geom_vline(aes(xintercept=0),lty=2)+ylab("PC2")+xlab("PC1")+
+  geom_segment(aes(x=0,y=0,xend=Comp.1,yend=Comp.2),arrow=arrow(),col="red")+
+  geom_label(aes(x=Comp.1*1.1,y=Comp.2*1.1,label=rowname))
+```
+

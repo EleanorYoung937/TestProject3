@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="author" content="Eleanor Young" />
+    <meta name="description" content="a collection of my personal and class projects">
+    <link rel="shortcut icon" type="image/x-icon" href="/img/favicon.ico">
+    <title>SDS348 project 1</title>
+    <meta name="generator" content="Hugo 0.70.0" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="/css/main.css" />
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,400,200bold,400old" />
+    
+    <!--[if lt IE 9]>
+			<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+			<script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+		<![endif]-->
+
+    
+  </head>
+
+  <body>
+    <div id="wrap">
+
+      
+      <nav class="navbar navbar-default">
+  <div class="container">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="/"><i class="fa fa-home"></i></a>
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <div class="navbar-collapse collapse" id="navbar">
+      <ul class="nav navbar-nav navbar-right">
+      
+        
+        <li><a href="/blog/">BLOG</a></li>
+        
+        <li><a href="/projects/">PROJECTS</a></li>
+        
+        <li><a href="/resume.pdf">RESUME</a></li>
+        
+      
+      </ul>
+    </div>
+  </div>
+</nav>
+
+      
+      <div class="container">
+        <div class="blog-post">
+          <h3>
+            <strong><a href="/project1/">SDS348 project 1</a></strong>
+          </h3>
+        </div>
+        <div class="blog-title">
+          <h4>
+          January 1, 0001
+            &nbsp;&nbsp;
+            
+          </h4>
+        </div>
+        <div class="panel panel-default">
+          <div class="panel-body">
+            <div class="blogpost">
+              
+
+
+<div id="r-markdown" class="section level2">
+<h2>R Markdown</h2>
+<p>Introduction:
+I am incredibly interested in sustainibility, as I will witness the major effects of climate change in my life time. I chose the first datasets to investigate dietary choice by region and the co2 emmissions their production is responsible for. The dataset is from the tidytuesday github run by the rfordatascience group. The dataset countains varaibles specifying the country and type of food, as well as the consumption rate in units of kg/person/year and the rate of emmisions in units of CO2/person/year. The second dataset is a list of countries and their projected populations for each year from 2020 to 2050. The dataset is from The World Bank’s data bank. I will use these to calculate total consumption and emmissions for each year.
+Additionally, I am looking for correlation between population size and rates of consumption and emmission. I hypothesize that a country with more people may need to consume less or at a lower co2 emmissions rate than a smaller one. I approached this project with a focus on calculation and not prediction, and I am realizing that too late to correct my mistake. If I could do it again I would try to predict consumption and emmission using a country’s gdp or gdp per person.</p>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre class="r"><code>food_consumption_data &lt;- read.csv(&quot;food_consumption.csv&quot;)
+population_growth_data &lt;- read.csv(&quot;population_data.csv&quot;)
+head(food_consumption_data)</code></pre>
+<pre><code>##     country food_category consumption co2_emmission
+## 1 Argentina          Pork       10.51         37.20
+## 2 Argentina       Poultry       38.66         41.53
+## 3 Argentina          Beef       55.48       1712.00
+## 4 Argentina   Lamb &amp; Goat        1.56         54.63
+## 5 Argentina          Fish        4.36          6.96
+## 6 Argentina          Eggs       11.39         10.46</code></pre>
+<pre class="r"><code>head(population_growth_data)</code></pre>
+<pre><code>##   ï..Country.Name Country.Code       Series.Name Series.Code X2020..YR2020.
+## 1     Afghanistan          AFG Population, total SP.POP.TOTL    38928000.00
+## 2         Albania          ALB Population, total SP.POP.TOTL     2867000.00
+## 3         Algeria          DZA Population, total SP.POP.TOTL    43851000.00
+## 4  American Samoa          ASM Population, total SP.POP.TOTL       55000.00
+## 5         Andorra          AND Population, total SP.POP.TOTL       77000.00
+## 6          Angola          AGO Population, total SP.POP.TOTL    32866000.00
+##   X2021..YR2021. X2022..YR2022. X2023..YR2023. X2024..YR2024. X2025..YR2025.
+## 1    39835000.00    40754000.00    41681000.00    42609000.00    43532000.00
+## 2     2866000.00     2864000.00     2862000.00     2860000.00     2857000.00
+## 3    44617000.00    45350000.00    46053000.00    46731000.00    47388000.00
+## 4       55000.00       55000.00       55000.00       55000.00       55000.00
+## 5       77000.00       77000.00       78000.00       78000.00       78000.00
+## 6    33934000.00    35027000.00    36149000.00    37299000.00    38478000.00
+##   X2026..YR2026. X2027..YR2027. X2028..YR2028. X2029..YR2029. X2030..YR2030.
+## 1    44449000.00    45364000.00    46275000.00    47185000.00    48094000.00
+## 2     2853000.00     2849000.00     2843000.00     2837000.00     2830000.00
+## 3    48022000.00    48634000.00    49226000.00    49801000.00    50361000.00
+## 4       55000.00       55000.00       55000.00       55000.00       55000.00
+## 5       78000.00       78000.00       78000.00       78000.00       78000.00
+## 6    39688000.00    40929000.00    42200000.00    43502000.00    44835000.00
+##   X2031..YR2031. X2032..YR2032. X2033..YR2033. X2034..YR2034. X2035..YR2035.
+## 1    49000000.00    49904000.00    50804000.00    51699000.00    52587000.00
+## 2     2822000.00     2813000.00     2803000.00     2791000.00     2778000.00
+## 3    50908000.00    51444000.00    51971000.00    52494000.00    53016000.00
+## 4       55000.00       55000.00       55000.00       55000.00       55000.00
+## 5       78000.00       78000.00       78000.00       78000.00       78000.00
+## 6    46198000.00    47593000.00    49017000.00    50471000.00    51953000.00
+##   X2036..YR2036. X2037..YR2037. X2038..YR2038. X2039..YR2039. X2040..YR2040.
+## 1    53469000.00    54343000.00    55209000.00    56065000.00    56912000.00
+## 2     2764000.00     2748000.00     2732000.00     2715000.00     2696000.00
+## 3    53537000.00    54059000.00    54583000.00    55110000.00    55640000.00
+## 4       54000.00       54000.00       54000.00       54000.00       54000.00
+## 5       78000.00       78000.00       78000.00       78000.00       78000.00
+## 6    53462000.00    55000000.00    56566000.00    58160000.00    59782000.00
+##   X2041..YR2041. X2042..YR2042. X2043..YR2043. X2044..YR2044. X2045..YR2045.
+## 1    57748000.00    58574000.00    59387000.00    60188000.00    60974000.00
+## 2     2677000.00     2658000.00     2638000.00     2617000.00     2597000.00
+## 3    56174000.00    56711000.00    57250000.00    57789000.00    58326000.00
+## 4       54000.00       54000.00       54000.00       54000.00       54000.00
+## 5       78000.00       78000.00       78000.00       77000.00       77000.00
+## 6    61432000.00    63110000.00    64814000.00    66544000.00    68298000.00
+##   X2046..YR2046. X2047..YR2047. X2048..YR2048. X2049..YR2049. X2050..YR2050.
+## 1    61746000.00    62503000.00    63245000.00    63972000.00    64683000.00
+## 2     2576000.00     2555000.00     2535000.00     2514000.00     2493000.00
+## 3    58859000.00    59388000.00    59911000.00    60423000.00    60923000.00
+## 4       54000.00       54000.00       54000.00       54000.00       54000.00
+## 5       77000.00       77000.00       77000.00       76000.00       76000.00
+## 6    70075000.00    71877000.00    73701000.00    75549000.00    77420000.00</code></pre>
+<p>I had to rename Country.Name to Country in the population growth dataset because it included a strange character that made it hard to call. Additionally, I had to write a function to rename the year labels for the columns to make them understandable. Then I removed extraneous columns that were not useful. I then used pivot_longer so I could join it with food_consumption data, which was already tidy. I used pivot_longer and pivot_wider on this dataset to demonstrate them.</p>
+<p>refrence for renaming columns: <a href="https://honingds.com/blog/dplyr-rename/" class="uri">https://honingds.com/blog/dplyr-rename/</a>
+refrence for substring function: <a href="http://rfunction.com/archives/1692" class="uri">http://rfunction.com/archives/1692</a>
+refrence for str_replace function: <a href="https://www.rdocumentation.org/packages/stringr/versions/1.4.0/topics/str_replace" class="uri">https://www.rdocumentation.org/packages/stringr/versions/1.4.0/topics/str_replace</a>
+refrence for rename troubleshooting: <a href="https://stackoverflow.com/questions/26371279/dplyr-0-3-0-2-rename-idiom-unstable-when-reshape-package-is-loaded" class="uri">https://stackoverflow.com/questions/26371279/dplyr-0-3-0-2-rename-idiom-unstable-when-reshape-package-is-loaded</a></p>
+<pre class="r"><code>renameX &lt;- function(X) (str_replace(X, X, substring(X, 2, 5)))
+colnames &lt;- population_growth_data %&gt;% colnames
+population_growth_data &lt;- population_growth_data %&gt;% dplyr::rename(Country = colnames[1]) %&gt;% 
+    rename_at(vars(starts_with(&quot;X&quot;)), renameX) %&gt;% select(-contains(&quot;.&quot;))
+
+head(population_growth_data)</code></pre>
+<pre><code>##          Country        2020        2021        2022        2023        2024
+## 1    Afghanistan 38928000.00 39835000.00 40754000.00 41681000.00 42609000.00
+## 2        Albania  2867000.00  2866000.00  2864000.00  2862000.00  2860000.00
+## 3        Algeria 43851000.00 44617000.00 45350000.00 46053000.00 46731000.00
+## 4 American Samoa    55000.00    55000.00    55000.00    55000.00    55000.00
+## 5        Andorra    77000.00    77000.00    77000.00    78000.00    78000.00
+## 6         Angola 32866000.00 33934000.00 35027000.00 36149000.00 37299000.00
+##          2025        2026        2027        2028        2029        2030
+## 1 43532000.00 44449000.00 45364000.00 46275000.00 47185000.00 48094000.00
+## 2  2857000.00  2853000.00  2849000.00  2843000.00  2837000.00  2830000.00
+## 3 47388000.00 48022000.00 48634000.00 49226000.00 49801000.00 50361000.00
+## 4    55000.00    55000.00    55000.00    55000.00    55000.00    55000.00
+## 5    78000.00    78000.00    78000.00    78000.00    78000.00    78000.00
+## 6 38478000.00 39688000.00 40929000.00 42200000.00 43502000.00 44835000.00
+##          2031        2032        2033        2034        2035        2036
+## 1 49000000.00 49904000.00 50804000.00 51699000.00 52587000.00 53469000.00
+## 2  2822000.00  2813000.00  2803000.00  2791000.00  2778000.00  2764000.00
+## 3 50908000.00 51444000.00 51971000.00 52494000.00 53016000.00 53537000.00
+## 4    55000.00    55000.00    55000.00    55000.00    55000.00    54000.00
+## 5    78000.00    78000.00    78000.00    78000.00    78000.00    78000.00
+## 6 46198000.00 47593000.00 49017000.00 50471000.00 51953000.00 53462000.00
+##          2037        2038        2039        2040        2041        2042
+## 1 54343000.00 55209000.00 56065000.00 56912000.00 57748000.00 58574000.00
+## 2  2748000.00  2732000.00  2715000.00  2696000.00  2677000.00  2658000.00
+## 3 54059000.00 54583000.00 55110000.00 55640000.00 56174000.00 56711000.00
+## 4    54000.00    54000.00    54000.00    54000.00    54000.00    54000.00
+## 5    78000.00    78000.00    78000.00    78000.00    78000.00    78000.00
+## 6 55000000.00 56566000.00 58160000.00 59782000.00 61432000.00 63110000.00
+##          2043        2044        2045        2046        2047        2048
+## 1 59387000.00 60188000.00 60974000.00 61746000.00 62503000.00 63245000.00
+## 2  2638000.00  2617000.00  2597000.00  2576000.00  2555000.00  2535000.00
+## 3 57250000.00 57789000.00 58326000.00 58859000.00 59388000.00 59911000.00
+## 4    54000.00    54000.00    54000.00    54000.00    54000.00    54000.00
+## 5    78000.00    77000.00    77000.00    77000.00    77000.00    77000.00
+## 6 64814000.00 66544000.00 68298000.00 70075000.00 71877000.00 73701000.00
+##          2049        2050
+## 1 63972000.00 64683000.00
+## 2  2514000.00  2493000.00
+## 3 60423000.00 60923000.00
+## 4    54000.00    54000.00
+## 5    76000.00    76000.00
+## 6 75549000.00 77420000.00</code></pre>
+<pre class="r"><code>population_growth_data &lt;- population_growth_data %&gt;% pivot_longer(-c(&quot;Country&quot;), 
+    names_to = &quot;Year&quot;, values_to = &quot;Population&quot;)
+head(population_growth_data)</code></pre>
+<pre><code>## # A tibble: 6 x 3
+##   Country     Year  Population 
+##   &lt;fct&gt;       &lt;chr&gt; &lt;fct&gt;      
+## 1 Afghanistan 2020  38928000.00
+## 2 Afghanistan 2021  39835000.00
+## 3 Afghanistan 2022  40754000.00
+## 4 Afghanistan 2023  41681000.00
+## 5 Afghanistan 2024  42609000.00
+## 6 Afghanistan 2025  43532000.00</code></pre>
+<pre class="r"><code>food_consumption_data %&gt;% pivot_wider(names_from = &quot;food_category&quot;, 
+    values_from = c(&quot;consumption&quot;, &quot;co2_emmission&quot;)) %&gt;% pivot_longer(-c(&quot;country&quot;), 
+    names_to = &quot;food_category&quot;, values_to = &quot;value&quot;) %&gt;% separate(food_category, 
+    into = c(&quot;metric&quot;, &quot;food_category&quot;), sep = &quot;_&quot;) %&gt;% glimpse()</code></pre>
+<pre><code>## Observations: 2,860
+## Variables: 4
+## $ country       &lt;fct&gt; Argentina, Argentina, Argentina, Argentina, Argentina...
+## $ metric        &lt;chr&gt; &quot;consumption&quot;, &quot;consumption&quot;, &quot;consumption&quot;, &quot;consump...
+## $ food_category &lt;chr&gt; &quot;Pork&quot;, &quot;Poultry&quot;, &quot;Beef&quot;, &quot;Lamb &amp; Goat&quot;, &quot;Fish&quot;, &quot;Eg...
+## $ value         &lt;dbl&gt; 10.51, 38.66, 55.48, 1.56, 4.36, 11.39, 195.08, 103.1...</code></pre>
+<pre class="r"><code># pivot_wider(names_from = &#39;metric&#39;, values_from = &#39;temp&#39;)</code></pre>
+<p>I joined by country, because it is the common variable in my two datasets. I preformed an innerjoin to elimante the values the two datasets did not share. There were 262 countries in the population prediction dataset and 130 in the food consumption dataset. 116 of these countries were shared by the two datasets. Because there are still 116 countries in the combined sample set, I do not expect to be limited by sampling size and think this is still representative of the world population.</p>
+<pre class="r"><code>data &lt;- inner_join(population_growth_data, food_consumption_data, 
+    c(Country = &quot;country&quot;))
+head(data)</code></pre>
+<pre><code>## # A tibble: 6 x 6
+##   Country Year  Population food_category consumption co2_emmission
+##   &lt;chr&gt;   &lt;chr&gt; &lt;fct&gt;      &lt;fct&gt;               &lt;dbl&gt;         &lt;dbl&gt;
+## 1 Albania 2020  2867000.00 Pork                10.9          38.5 
+## 2 Albania 2020  2867000.00 Poultry             13.2          14.2 
+## 3 Albania 2020  2867000.00 Beef                22.5         694.  
+## 4 Albania 2020  2867000.00 Lamb &amp; Goat         15.3         536.  
+## 5 Albania 2020  2867000.00 Fish                 3.85          6.15
+## 6 Albania 2020  2867000.00 Eggs                12.4          11.4</code></pre>
+<pre class="r"><code>length(unique(population_growth_data$Country))</code></pre>
+<pre><code>## [1] 262</code></pre>
+<pre class="r"><code>length(unique(food_consumption_data$country))</code></pre>
+<pre><code>## [1] 130</code></pre>
+<pre class="r"><code>length(intersect((unique(population_growth_data$Country)), (unique(food_consumption_data$country))))</code></pre>
+<pre><code>## [1] 116</code></pre>
+<pre class="r"><code># anti_join(population_growth_data, food_consumption_data,
+# c(&#39;Country&#39; = &#39;country&#39;)) %&gt;% select(Country) %&gt;% unique()</code></pre>
+<p>I made the variable decade, so I could categorize data by the decade. Then I had to force all the numeric variables I had to be numeric and not factors. Then I calculated total emmissions and consumtions for each country, each year. I calculated summary statistics 25th percentile, minimum ,75th percentile, maximum, mean, and standard deiveation for each food category’s rate and total cosumption and co2 emmissions for the year 2020. This is our origin point for these predictions. I then calculated the total co2 emmissions and consumption of each country, by decade. I did this because it naos the change over time, and I will use the stats in graphs later on.
+Lastly, I calculated the mean, median, and standard deviation for the rate and total co2, then consumtion, sepertly. I ordered each by rate to see which countries consume the most and which produce their food most inefficiently. Finland consumes the most and all of the top 10 consumers are European. On the other hand, Argentina is the most inefficient in terms of how much CO2 it produces. The top 10 are not all from the same region. Further analysis is necessay, but these regions may be the more beef and pork reliant countries.</p>
+<p>case_when reference: <a href="https://dplyr.tidyverse.org/reference/case_when.html" class="uri">https://dplyr.tidyverse.org/reference/case_when.html</a>
+select using indexes reference: <a href="https://www.datanovia.com/en/lessons/select-data-frame-columns-in-r/" class="uri">https://www.datanovia.com/en/lessons/select-data-frame-columns-in-r/</a>
+changing factor to numeric reference: <a href="https://www.dummies.com/programming/r/how-to-convert-a-factor-in-r/" class="uri">https://www.dummies.com/programming/r/how-to-convert-a-factor-in-r/</a>
+summary statistics table reference: <a href="https://stackoverflow.com/questions/34594641/dplyr-summary-table-for-multiple-variables" class="uri">https://stackoverflow.com/questions/34594641/dplyr-summary-table-for-multiple-variables</a></p>
+<pre class="r"><code>#count na function
+countna &lt;- function(x)sum(is.na(x))
+
+# add catagorical variable: decade
+makedecade &lt;- function(X){
+  case_when(
+  substring(X, 3, 3) == 1 ~ 2010,
+  substring(X, 3, 3) == 2 ~ 2020,
+  substring(X, 3, 3) == 3 ~ 2030,
+  substring(X, 3, 3) == 4 ~ 2040,
+  substring(X, 3, 3) == 5 ~ 2050
+  )
+}
+data &lt;- data %&gt;% mutate(Decade = makedecade(Year))
+
+#make sure all &quot;numeric&quot; variables are really numeric
+data &lt;- data %&gt;% 
+  mutate_at(vars(2,5,6), as.numeric) %&gt;%
+  mutate(Population = as.numeric(as.character(Population))) %&gt;%
+  glimpse()</code></pre>
+<pre><code>## Observations: 39,556
+## Variables: 7
+## $ Country       &lt;chr&gt; &quot;Albania&quot;, &quot;Albania&quot;, &quot;Albania&quot;, &quot;Albania&quot;, &quot;Albania&quot;...
+## $ Year          &lt;dbl&gt; 2020, 2020, 2020, 2020, 2020, 2020, 2020, 2020, 2020,...
+## $ Population    &lt;dbl&gt; 2867000, 2867000, 2867000, 2867000, 2867000, 2867000,...
+## $ food_category &lt;fct&gt; Pork, Poultry, Beef, Lamb &amp; Goat, Fish, Eggs, Milk - ...
+## $ consumption   &lt;dbl&gt; 10.88, 13.23, 22.50, 15.32, 3.85, 12.45, 303.72, 138....
+## $ co2_emmission &lt;dbl&gt; 38.51, 14.21, 694.30, 536.50, 6.15, 11.44, 432.62, 26...
+## $ Decade        &lt;dbl&gt; 2020, 2020, 2020, 2020, 2020, 2020, 2020, 2020, 2020,...</code></pre>
+<pre class="r"><code>#make total consumption and total co2 variables
+data &lt;- data %&gt;% mutate(
+  #Population = as.numeric(as.character(Population)),
+  total_consumption = consumption * Population,
+  total_co2 = co2_emmission * Population) %&gt;%
+  dplyr::rename(rate_consumption = consumption, 
+                rate_co2 = co2_emmission)
+
+countna(data$total_co2)</code></pre>
+<pre><code>## [1] 341</code></pre>
+<pre class="r"><code>countna(data$total_consumption)</code></pre>
+<pre><code>## [1] 341</code></pre>
+<pre class="r"><code>length(data$total_co2)</code></pre>
+<pre><code>## [1] 39556</code></pre>
+<pre class="r"><code>length(data$total_consumption)</code></pre>
+<pre><code>## [1] 39556</code></pre>
+<pre class="r"><code># filter goes by rows
+# select goes by column
+
+data2 &lt;- data %&gt;% 
+  group_by(food_category) %&gt;%
+  filter(Year == &quot;2020&quot;) %&gt;%
+  drop_na() %&gt;%
+  select(rate_co2, total_co2) %&gt;% 
+  summarise_each(funs(min = min, 
+                      q25 = quantile(., 0.25), 
+                      median = median, 
+                      q75 = quantile(., 0.75), 
+                      max = max,
+                      mean = mean, 
+                      sd = sd))
+
+data3 &lt;- data %&gt;%
+  drop_na() %&gt;%
+  group_by(Country, Decade) %&gt;%
+  select(total_consumption, rate_consumption, total_co2, rate_co2) %&gt;%
+  summarise_each(funs(sum = sum))
+
+data4 &lt;- data %&gt;%
+  drop_na() %&gt;%
+  group_by(Country) %&gt;%
+  select(rate_consumption, total_consumption) %&gt;%
+  summarise_each(funs(median = median, 
+                      mean = mean, 
+                      sd = sd)) %&gt;%
+  arrange(desc(rate_consumption_mean))
+
+data5 &lt;- data %&gt;%
+  drop_na() %&gt;%
+  group_by(Country) %&gt;%
+  select(rate_co2, total_co2) %&gt;%
+  summarise_each(funs(median = median, 
+                      mean = mean, 
+                      sd = sd)) %&gt;%
+  arrange(desc(rate_co2_mean))
+
+print(data2)</code></pre>
+<pre><code>## # A tibble: 11 x 15
+##    food_category rate_co2_min total_co2_min rate_co2_q25 total_co2_q25
+##    &lt;fct&gt;                &lt;dbl&gt;         &lt;dbl&gt;        &lt;dbl&gt;         &lt;dbl&gt;
+##  1 Beef                 24.1       12065010       153.      1028229180
+##  2 Eggs                  0.15       1073500         3.56      20960880
+##  3 Fish                  0.38       4811820         8.92      63303125
+##  4 Lamb &amp; Goat           0                0        19.8      133682610
+##  5 Milk - inc. ~         4.33      13983750        64.2      502588310
+##  6 Nuts inc. Pe~         0.32         36160         2.94      14260975
+##  7 Pork                  0                0         6.46      42987875
+##  8 Poultry               0.5        5281620         9.42      48940235
+##  9 Rice                  1.22       1381990         5.8       33261700
+## 10 Soybeans              0                0         0                0
+## 11 Wheat and Wh~         0.52       1283680         6.66      41614140
+## # ... with 10 more variables: rate_co2_median &lt;dbl&gt;, total_co2_median &lt;dbl&gt;,
+## #   rate_co2_q75 &lt;dbl&gt;, total_co2_q75 &lt;dbl&gt;, rate_co2_max &lt;dbl&gt;,
+## #   total_co2_max &lt;dbl&gt;, rate_co2_mean &lt;dbl&gt;, total_co2_mean &lt;dbl&gt;,
+## #   rate_co2_sd &lt;dbl&gt;, total_co2_sd &lt;dbl&gt;</code></pre>
+<pre class="r"><code>print(data3)</code></pre>
+<pre><code>## # A tibble: 460 x 6
+## # Groups:   Country [115]
+##    Country Decade total_consumption~ rate_consumptio~ total_co2_sum rate_co2_sum
+##    &lt;chr&gt;    &lt;dbl&gt;              &lt;dbl&gt;            &lt;dbl&gt;         &lt;dbl&gt;        &lt;dbl&gt;
+##  1 Albania   2020        15213703340            5327.   50771840300       17778.
+##  2 Albania   2030        14807763080            5327.   49417118600       17778.
+##  3 Albania   2040        13884541990            5327.   46336104550       17778.
+##  4 Albania   2050         1328095890             533.    4432180050        1778.
+##  5 Algeria   2020       171200505230            3645.  332472123240        7079.
+##  6 Algeria   2030       192272828330            3645.  373394666040        7079.
+##  7 Algeria   2040       211587484210            3645.  410903811480        7079.
+##  8 Algeria   2050        22207042730             365.   43126173240         708.
+##  9 Angola    2020        44084551280            1160.  156965935280        4130.
+## 10 Angola    2030        59532447450            1160.  211969182450        4130.
+## # ... with 450 more rows</code></pre>
+<pre class="r"><code>print(data4)</code></pre>
+<pre><code>## # A tibble: 115 x 7
+##    Country rate_consumptio~ total_consumpti~ rate_consumptio~ total_consumpti~
+##    &lt;chr&gt;              &lt;dbl&gt;            &lt;dbl&gt;            &lt;dbl&gt;            &lt;dbl&gt;
+##  1 Finland             19.2       108938960              58.2       328895213.
+##  2 Lithua~             13.1        34086000              50.5       130894470.
+##  3 Sweden              16.6       186018560              50         559109677.
+##  4 Nether~             17.7       314137260.             48.6       860551003.
+##  5 Albania             12.4        33802650              48.4       132651332.
+##  6 Ireland             17.4        93958170              47.2       254667797.
+##  7 Switze~             13.5       125849280              46.8       434497082.
+##  8 Italy               15.6       913458000              46.7      2727928502.
+##  9 Denmark             16.5       101116680.             45.4       277348274.
+## 10 Luxemb~             21.4        14937630              45.3        32616100.
+## # ... with 105 more rows, and 2 more variables: rate_consumption_sd &lt;dbl&gt;,
+## #   total_consumption_sd &lt;dbl&gt;</code></pre>
+<pre class="r"><code>print(data5)</code></pre>
+<pre><code>## # A tibble: 115 x 7
+##    Country rate_co2_median total_co2_median rate_co2_mean total_co2_mean
+##    &lt;chr&gt;             &lt;dbl&gt;            &lt;dbl&gt;         &lt;dbl&gt;          &lt;dbl&gt;
+##  1 Argent~            19.7        997646700          197.    9976336091.
+##  2 Austra~            28.2        837132250          176.    5208730288.
+##  3 Albania            14.2         39475380          162.     442689864.
+##  4 New Ze~            32.5        178447390          159.     868106633.
+##  5 Iceland            28.9         11226540          157.      60790537.
+##  6 Uruguay            20.8         75122550          149.     532942304.
+##  7 Brazil             21.7       4932164640          147.   33053556512.
+##  8 Luxemb~            23.0         16623040          145.     104707574.
+##  9 Kazakh~            17.6        366062400          143.    2977510908.
+## 10 Sweden             17.9        199768730          139.    1552322274.
+## # ... with 105 more rows, and 2 more variables: rate_co2_sd &lt;dbl&gt;,
+## #   total_co2_sd &lt;dbl&gt;</code></pre>
+<p>The strongest correlations are between the total co2 and total consumption variables and the variables used to calculate them. It is unsurprising that these variables are correlated. Interestingly, there appears to be no correlation between rate of co2 emmissions or rate of consumption. Countries with more people did not consume less, or more efficiently than smaller ones, or vice versa.</p>
+<pre class="r"><code>df &lt;- data %&gt;% na.omit %&gt;% select_if(is.numeric) %&gt;% select(-c(&quot;Decade&quot;))
+cor(df)</code></pre>
+<pre><code>##                           Year  Population rate_consumption      rate_co2
+## Year              1.000000e+00  0.01794062     2.231750e-22  2.681598e-21
+## Population        1.794062e-02  1.00000000    -2.966298e-02 -4.254067e-02
+## rate_consumption  2.231750e-22 -0.02966298     1.000000e+00  3.523835e-01
+## rate_co2          2.681598e-21 -0.04254067     3.523835e-01  1.000000e+00
+## total_consumption 7.252253e-03  0.58390838     2.164881e-01  5.642218e-02
+## total_co2         8.642441e-03  0.50984122     9.725249e-02  3.252999e-01
+##                   total_consumption   total_co2
+## Year                    0.007252253 0.008642441
+## Population              0.583908380 0.509841221
+## rate_consumption        0.216488135 0.097252487
+## rate_co2                0.056422185 0.325299939
+## total_consumption       1.000000000 0.577394468
+## total_co2               0.577394468 1.000000000</code></pre>
+<pre class="r"><code>tidycor &lt;- cor(df) %&gt;% as.data.frame %&gt;% rownames_to_column %&gt;% 
+    pivot_longer(-1, names_to = &quot;name&quot;, values_to = &quot;correlation&quot;)
+head(tidycor)</code></pre>
+<pre><code>## # A tibble: 6 x 3
+##   rowname name              correlation
+##   &lt;chr&gt;   &lt;chr&gt;                   &lt;dbl&gt;
+## 1 Year    Year                 1.00e+ 0
+## 2 Year    Population           1.79e- 2
+## 3 Year    rate_consumption     2.23e-22
+## 4 Year    rate_co2             2.68e-21
+## 5 Year    total_consumption    7.25e- 3
+## 6 Year    total_co2            8.64e- 3</code></pre>
+<pre class="r"><code>tidycor %&gt;% ggplot(aes(rowname, name, fill = correlation)) + 
+    geom_tile() + scale_fill_gradient2(low = &quot;red&quot;, mid = &quot;white&quot;, 
+    high = &quot;blue&quot;) + geom_text(aes(label = round(correlation, 
+    2)), color = &quot;black&quot;, size = 4) + theme(axis.text.x = element_text(angle = 90, 
+    hjust = 1)) + coord_fixed()</code></pre>
+<p><img src="/project1_files/figure-html/unnamed-chunk-7-1.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code># graph showing each country&#39;s percentage food category from
+# total consumption graph showing total consumption or co2
+# over year for the top 5 or 10 boxplot of consumption and
+# co2 rate in the year 2020, facet by food category
+
+temp &lt;- data %&gt;% group_by(Country) %&gt;% summarise(sum = sum(total_consumption)) %&gt;% 
+    arrange(desc(sum)) %&gt;% pull(Country)
+data %&gt;% group_by(Country) %&gt;% filter(Year == 2020) %&gt;% filter(Country %in% 
+    temp[1:10]) %&gt;% ggplot(aes(x = Country, y = total_consumption)) + 
+    geom_bar(stat = &quot;identity&quot;, aes(fill = food_category)) + 
+    theme_bw() + theme(axis.text.x = element_text(angle = 45, 
+    hjust = 1))</code></pre>
+<p><img src="/project1_files/figure-html/unnamed-chunk-8-1.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>temp &lt;- data %&gt;% group_by(Country) %&gt;% summarise(sum = sum(rate_consumption)) %&gt;% 
+    arrange(desc(sum)) %&gt;% pull(Country)
+data %&gt;% group_by(Country) %&gt;% filter(Year == 2020) %&gt;% filter(Country %in% 
+    temp[1:10]) %&gt;% ggplot(aes(x = Country, y = total_consumption)) + 
+    geom_bar(stat = &quot;identity&quot;, aes(fill = food_category)) + 
+    theme_bw() + theme(axis.text.x = element_text(angle = 45, 
+    hjust = 1))</code></pre>
+<p><img src="/project1_files/figure-html/unnamed-chunk-8-2.png" width="768" style="display: block; margin: auto;" /></p>
+<p>India is the highest for PCA1 and PCA2, while Finland is the lowest for PCA1 and Barbados and Granada are the lowest. On the graph the rates of co2 and consumption have the smallest angles, meaning they have a high negative correlation with PCA1. Year has the smallest angle from the Y-axis, meaning it has the highest correlation with PCA2. Population is more strongly correlated with PCA2 than PCA1.</p>
+<pre class="r"><code>data &lt;- data %&gt;% drop_na() %&gt;% mutate(name = paste(Country, Year, 
+    food_category, sep = &quot; &quot;))
+# unite(name, c(&#39;Country&#39;, &#39;Year&#39;, &#39;food_category&#39;))
+data6 &lt;- data %&gt;% select_if(is.numeric) %&gt;% select(-contains(&quot;total&quot;), 
+    -Decade) %&gt;% scale
+rownames(data6) &lt;- data$name
+pca &lt;- princomp(data6)
+summary(pca, loadings = T)</code></pre>
+<pre><code>## Importance of components:
+##                           Comp.1    Comp.2    Comp.3    Comp.4
+## Standard deviation     1.1660262 1.0072518 0.9891223 0.8045879
+## Proportion of Variance 0.3399129 0.2536455 0.2445970 0.1618445
+## Cumulative Proportion  0.3399129 0.5935585 0.8381555 1.0000000
+## 
+## Loadings:
+##                  Comp.1 Comp.2 Comp.3 Comp.4
+## Year                     0.772  0.635       
+## Population        0.141  0.628 -0.765       
+## rate_consumption -0.699                0.706
+## rate_co2         -0.701               -0.708</code></pre>
+<pre class="r"><code>eigval &lt;- pca$sdev^2
+varprop = round(eigval/sum(eigval), 2)
+ggplot() + geom_bar(aes(y = varprop, x = 1:4), stat = &quot;identity&quot;) + 
+    xlab(&quot;&quot;) + geom_path(aes(y = varprop, x = 1:4)) + geom_text(aes(x = 1:4, 
+    y = varprop, label = round(varprop, 2)), vjust = 1, col = &quot;white&quot;, 
+    size = 5) + scale_y_continuous(breaks = seq(0, 0.6, 0.2), 
+    labels = scales::percent) + scale_x_continuous(breaks = 1:10)</code></pre>
+<p><img src="/project1_files/figure-html/unnamed-chunk-9-1.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>data6df &lt;- data.frame(PC1 = pca$scores[, 1], PC2 = pca$scores[, 
+    2])
+ggplot(data6df, aes(PC1, PC2)) + geom_point()</code></pre>
+<p><img src="/project1_files/figure-html/unnamed-chunk-9-2.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>Name &lt;- data$name
+pca$scores %&gt;% as.data.frame %&gt;% cbind(Name, .) %&gt;% top_n(3, 
+    Comp.1)</code></pre>
+<pre><code>##                  Name   Comp.1   Comp.2    Comp.3     Comp.4
+## 1 India 2049 Soybeans 1.868680 6.180761 -5.072735 -0.2444494
+## 2     India 2050 Pork 1.869362 6.276963 -5.013692 -0.2500517
+## 3 India 2050 Soybeans 1.871646 6.276828 -5.013564 -0.2447051</code></pre>
+<pre class="r"><code>pca$scores %&gt;% as.data.frame %&gt;% cbind(Name, .) %&gt;% top_n(3, 
+    wt = desc(Comp.1))</code></pre>
+<pre><code>##                              Name    Comp.1     Comp.2    Comp.3   Comp.4
+## 1 Finland 2020 Milk - inc. cheese -8.085695 -0.6580538 -1.757102 3.017762
+## 2 Finland 2021 Milk - inc. cheese -8.084898 -0.5716461 -1.686160 3.017908
+## 3 Finland 2022 Milk - inc. cheese -8.084101 -0.4852416 -1.615214 3.018055</code></pre>
+<pre class="r"><code>pca$scores %&gt;% as.data.frame %&gt;% cbind(Name, .) %&gt;% top_n(3, 
+    wt = Comp.2)</code></pre>
+<pre><code>##                                  Name    Comp.1   Comp.2    Comp.3    Comp.4
+## 1       India 2050 Milk - inc. cheese 0.1583618 6.450460 -5.207017 0.3497473
+## 2 India 2050 Wheat and Wheat Products 0.9950189 6.373131 -5.122614 0.5329922
+## 3                     India 2050 Rice 0.5108118 6.415739 -5.168568 0.2908253</code></pre>
+<pre class="r"><code>pca$scores %&gt;% as.data.frame %&gt;% cbind(Name, .) %&gt;% top_n(3, 
+    wt = desc(Comp.2))</code></pre>
+<pre><code>##                                   Name    Comp.1    Comp.2     Comp.3
+## 1               Barbados 2020 Soybeans 0.6743399 -1.563246 -0.7467690
+## 2                Grenada 2020 Soybeans 0.6756804 -1.563960 -0.7459138
+## 3 Grenada 2020 Nuts inc. Peanut Butter 0.6718569 -1.563580 -0.7463351
+##        Comp.4
+## 1 -0.03387630
+## 2 -0.03486046
+## 3 -0.03402320</code></pre>
+<pre class="r"><code>pca$loadings[1:4, 1:2] %&gt;% as.data.frame %&gt;% rownames_to_column %&gt;% 
+    ggplot() + geom_hline(aes(yintercept = 0), lty = 2) + geom_vline(aes(xintercept = 0), 
+    lty = 2) + ylab(&quot;PC2&quot;) + xlab(&quot;PC1&quot;) + geom_segment(aes(x = 0, 
+    y = 0, xend = Comp.1, yend = Comp.2), arrow = arrow(), col = &quot;red&quot;) + 
+    geom_label(aes(x = Comp.1 * 1.1, y = Comp.2 * 1.1, label = rowname))</code></pre>
+<p><img src="/project1_files/figure-html/unnamed-chunk-9-3.png" width="768" style="display: block; margin: auto;" /></p>
+</div>
+
+              <hr>
+              <div class="related-posts">
+                <h5>Related Posts</h5>
+                
+              </div>
+            </div>
+          </div>
+          <hr>
+        <div class="disqus">
+  <div id="disqus_thread"></div>
+  <script type="text/javascript">
+
+    (function() {
+      
+      
+      if (window.location.hostname == "localhost")
+        return;
+
+      var disqus_shortname = '';
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+  </script>
+  <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  <a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+        </div>
+      </div>
+      
+    </div>
+
+    
+    <footer>
+  <div id="footer">
+    <div class="container">
+      <p class="text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io/">Hugo</a> and
+      <a href="http://www.github.com/nurlansu/hugo-sustain/">sustain</a> with ♥</p>
+    </div>
+  </div>
+</footer>
+<div class="footer"></div>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script src="/js/docs.min.js"></script>
+<script src="/js/main.js"></script>
+
+<script src="/js/ie10-viewport-bug-workaround.js"></script>
+
+
+    
+  </body>
+</html>

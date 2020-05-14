@@ -1,0 +1,632 @@
+---
+title: "Project2"
+output: html_document
+---
+
+
+
+<p>My primary source of data is the 2015 Human Data Report, which I accessed through Kaggle. It measures the following variables for each country: Human Development Index (HDI), Life Expectancy at Birth, Expected Years of Education, Mean Years of Education, Gross National Income (GNI) per Capita. I also included the happiness score for each country from the 2017 World Happiness Report, which I also accessed through Kaggle. All of these are numerical data.
+The catagorical variables were pulled individually from the World Bank Data Catalog and are binary (0 = no, 1 = yes) responses to the questions: “Nonpregnant and nonnursing women can do the same jobs as men” (variable:job) which was answered via surveys to gauge social attitudes in each country and “Nondiscrimination clause mentions gender in the constitution” (variable:clause) which could be assesed by the country’s constitution. There is also a dataset from the World Bank Data Catalog that included variables that splits countries into the catagories of low-, medium-, and high-income level (variable:income) and region of the world (variable:region) I ultimately decided to drop the clause variable because there was not enough overlap in the countries surveyed with job, which had more observations.
+My response variable is whether or not the country has had a female head of state in the last 50 years, or since 1970. The source of this data is Wikipedia (not great, I know). I had found the exact same data from a different source but when I realized the site wanted me to pay 30 dollars for access, I opted to scrape the data from Wikipedia.</p>
+<pre class="r"><code>library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(plotROC)
+# install.packages(&#39;glmnet&#39;)
+library(glmnet)</code></pre>
+<pre class="r"><code>happiness_data &lt;- read.csv(&quot;2017.csv&quot;) %&gt;% drop_na() %&gt;% select(Country, 
+    HappinessScore) %&gt;% separate(Country, sep = &quot;,&quot;, c(&quot;Country&quot;, 
+    NA))  # %&gt;%
+# separate(Country, sep = &#39;[(]&#39;, c(&#39;Country&#39;, NA))
+
+job_data &lt;- read.csv(&quot;data2.csv&quot;)  #%&gt;%
+colnames &lt;- job_data %&gt;% colnames
+job_data &lt;- job_data %&gt;% drop_na() %&gt;% select(colnames[1], Country.Code, 
+    job) %&gt;% rename(Country = colnames[1]) %&gt;% separate(Country, 
+    sep = &quot;[(]&quot;, c(&quot;Country&quot;, NA))  # %&gt;%
+# separate(Country, sep = &#39;,&#39;, c(&#39;Country&#39;, NA))
+
+income_data &lt;- read.csv(&quot;data3.csv&quot;)  #%&gt;%
+colnames &lt;- income_data %&gt;% colnames
+income_data &lt;- income_data %&gt;% drop_na() %&gt;% rename(Country.Code = colnames[1]) %&gt;% 
+    separate(Country, sep = &quot;,&quot;, c(&quot;Country&quot;, NA))  #%&gt;%
+# separate(Country, sep = &#39;[(]&#39;, c(&#39;Country&#39;, NA))
+
+response &lt;- read.csv(&quot;response.csv&quot;)  #%&gt;% 
+colnames &lt;- response %&gt;% colnames
+response &lt;- response %&gt;% rename(Country = colnames[1])
+
+hd_data &lt;- read.csv(&quot;human_development.csv&quot;) %&gt;% separate(Country, 
+    sep = &quot;,&quot;, c(&quot;Country&quot;, NA))  # %&gt;%
+# separate(Country, sep = &#39;[(]&#39;, c(&#39;Country&#39;, NA))</code></pre>
+<p>I joined all the data together and counted the responses to the categorical features Region and Income Group: 7 and 4 respectively. I also added the response variable: whether or not there had been a female head of state in the last 50 years. There are 131 observations in the combined dataset.</p>
+<pre class="r"><code>data &lt;- income_data %&gt;% full_join(job_data) %&gt;% full_join(hd_data) %&gt;% 
+    full_join(happiness_data) %&gt;% drop_na() %&gt;% mutate(GNIperCaptia = as.numeric(GNIperCaptia)) %&gt;% 
+    mutate(FemaLeader = (ifelse(Country %in% response$Country, 
+        1, 0))) %&gt;% mutate(FemaLeader = factor(FemaLeader, levels = c(&quot;0&quot;, 
+    &quot;1&quot;))) %&gt;% mutate(job = factor(job, levels = c(&quot;0&quot;, &quot;1&quot;)))
+n_distinct(data$Region)</code></pre>
+<pre><code>## [1] 7</code></pre>
+<pre class="r"><code>n_distinct(data$IncomeGroup)</code></pre>
+<pre><code>## [1] 4</code></pre>
+<pre class="r"><code>length(data$Country.Code)</code></pre>
+<pre><code>## [1] 131</code></pre>
+<p>I performed a mean difference randomization test on female leadership (binary response of 1/0) to every numeric variable: HDI, LifeExpectancy, ExpectedEducation, MeanEducation, and HappinessScore.</p>
+<p>HDI Hypothesis
+Null: HDI is the same for countries with previous female leadership vs. without.
+Alternative: HDI is not the same for countries with previous female leadership vs. without.
+LifeExpectancy Hypothesis
+Null: LifeExpectancy is the same for countries with previous female leadership vs. without.
+Alternative: LifeExpectancy is not the same for countries with previous female leadership vs. without.
+ExpectedEducation Hypothesis
+Null: ExpectedEducation is the same for countries with previous female leadership vs. without.
+Alternative: ExpectedEducation is not the same for countries with previous female leadership vs.
+without.
+MeanEducation Hypothesis
+Null: MeanEducation is the same for countries with previous female leadership vs. without.
+Alternative: MeanEducation is not the same for countries with previous female leadership vs. without.
+HappinessScore Hypothesis
+Null: HappinessScore is the same for countries with previous female leadership vs. without.
+Alternative: HappinessScore is not the same for countries with previous female leadership vs.
+without.</p>
+<p>Using the mean differences of 5000 randomized samples from the dataset, I found that less than 0.05 of these were more extreme than either the difference between ExpectedEducation or LifeExpectancy for countries that had vs coutries that had not had a female leader. This means the null distribution can be rejected for these two variables and we can conlude there is significant evidence for a difference between the LifeExpectancy and ExpectedEducation of these two groups.</p>
+<pre class="r"><code># mean difference for randomization with a catagorical and a
+# numeric variable
+set.seed(348)
+distHDI &lt;- vector()
+distLifeExpectancy &lt;- vector()
+distExpectedEducation &lt;- vector()
+distMeanEducation &lt;- vector()
+distHappinessScore &lt;- vector()
+for (i in 1:5000) {
+    new &lt;- data.frame(FemaLeader = data$FemaLeader, HDI = sample(data$HDI), 
+        LifeExpectancy = sample(data$LifeExpectancy), ExpectedEducation = sample(data$ExpectedEducation), 
+        MeanEducation = sample(data$MeanEducation), HappinessScore = sample(data$HappinessScore))
+    distHDI[i] &lt;- new %&gt;% group_by(FemaLeader) %&gt;% summarize(means = mean(HDI)) %&gt;% 
+        pull(means) %&gt;% diff
+    distLifeExpectancy[i] &lt;- new %&gt;% group_by(FemaLeader) %&gt;% 
+        summarize(means = mean(LifeExpectancy)) %&gt;% pull(means) %&gt;% 
+        diff
+    distExpectedEducation[i] &lt;- new %&gt;% group_by(FemaLeader) %&gt;% 
+        summarize(means = mean(ExpectedEducation)) %&gt;% pull(means) %&gt;% 
+        diff
+    distMeanEducation[i] &lt;- new %&gt;% group_by(FemaLeader) %&gt;% 
+        summarize(means = mean(MeanEducation)) %&gt;% pull(means) %&gt;% 
+        diff
+    distHappinessScore[i] &lt;- new %&gt;% group_by(FemaLeader) %&gt;% 
+        summarize(means = mean(HappinessScore)) %&gt;% pull(means) %&gt;% 
+        diff
+}</code></pre>
+<pre class="r"><code>HDI_dif &lt;- data %&gt;% group_by(FemaLeader) %&gt;% summarize(means = mean(HDI)) %&gt;% 
+    pull(means) %&gt;% diff
+LifeExpectancy_dif &lt;- data %&gt;% group_by(FemaLeader) %&gt;% summarize(means = mean(LifeExpectancy)) %&gt;% 
+    pull(means) %&gt;% diff
+ExpectedEducation_dif &lt;- data %&gt;% group_by(FemaLeader) %&gt;% summarize(means = mean(ExpectedEducation)) %&gt;% 
+    pull(means) %&gt;% diff
+MeanEducation_dif &lt;- data %&gt;% group_by(FemaLeader) %&gt;% summarize(means = mean(MeanEducation)) %&gt;% 
+    pull(means) %&gt;% diff
+HappinessScore_dif &lt;- data %&gt;% group_by(FemaLeader) %&gt;% summarize(means = mean(HappinessScore)) %&gt;% 
+    pull(means) %&gt;% diff
+
+print(&quot;HDI:&quot;)</code></pre>
+<pre><code>## [1] &quot;HDI:&quot;</code></pre>
+<pre class="r"><code>mean(distHDI &lt; -HDI_dif | distHDI &gt; HDI_dif)</code></pre>
+<pre><code>## [1] 0.0772</code></pre>
+<pre class="r"><code>{
+    hist(distHDI, main = &quot;&quot;, ylab = &quot;&quot;)
+    abline(v = HDI_dif, col = &quot;red&quot;)
+}</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-5-1.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>print(&quot;LifeExpectancy&quot;)</code></pre>
+<pre><code>## [1] &quot;LifeExpectancy&quot;</code></pre>
+<pre class="r"><code>mean(distLifeExpectancy &lt; -LifeExpectancy_dif | distLifeExpectancy &gt; 
+    LifeExpectancy_dif)</code></pre>
+<pre><code>## [1] 0.0268</code></pre>
+<pre class="r"><code>{
+    hist(distLifeExpectancy, main = &quot;&quot;, ylab = &quot;&quot;)
+    abline(v = LifeExpectancy_dif, col = &quot;red&quot;)
+}</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-5-2.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>print(&quot;ExpectedEducation&quot;)</code></pre>
+<pre><code>## [1] &quot;ExpectedEducation&quot;</code></pre>
+<pre class="r"><code>mean(distExpectedEducation &lt; -ExpectedEducation_dif | distExpectedEducation &gt; 
+    ExpectedEducation_dif)</code></pre>
+<pre><code>## [1] 0.013</code></pre>
+<pre class="r"><code>{
+    hist(distExpectedEducation, main = &quot;&quot;, ylab = &quot;&quot;)
+    abline(v = ExpectedEducation_dif, col = &quot;red&quot;)
+}</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-5-3.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>print(&quot;MeanEducation&quot;)</code></pre>
+<pre><code>## [1] &quot;MeanEducation&quot;</code></pre>
+<pre class="r"><code>mean(distMeanEducation &lt; -MeanEducation_dif | distMeanEducation &gt; 
+    MeanEducation_dif)</code></pre>
+<pre><code>## [1] 0.0714</code></pre>
+<pre class="r"><code>{
+    hist(distMeanEducation, main = &quot;&quot;, ylab = &quot;&quot;)
+    abline(v = MeanEducation_dif, col = &quot;red&quot;)
+}</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-5-4.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>print(&quot;HappinessScore&quot;)</code></pre>
+<pre><code>## [1] &quot;HappinessScore&quot;</code></pre>
+<pre class="r"><code>mean(distHappinessScore &lt; -HappinessScore_dif | distHappinessScore &gt; 
+    HappinessScore_dif)</code></pre>
+<pre><code>## [1] 0.131</code></pre>
+<pre class="r"><code>{
+    hist(distHappinessScore, main = &quot;&quot;, ylab = &quot;&quot;)
+    abline(v = HappinessScore_dif, col = &quot;red&quot;)
+}</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-5-5.png" width="768" style="display: block; margin: auto;" /></p>
+<p>The MANOVA shows significant results (F-stat = 3.3541, p-value = 0.007068) which means that at least one variable is significantly different between the countries who have had female leaders and those who have not. Ad-hoc ANOVAs show that all LifeExpectancy and ExpectedEducation differ by whether or not countries have had female leadership (LifeExpectancy: F = 5.1634, p = 0.02472; ExpectedEducation: F = 6.4317 , p = 0.0124). For 8 tests there is a 0.3365796 probability of a type-1 error and the adjusted error rate should be 0.00625. This new value would lead to a rejection of the MANOVA meaning that none of the variables are significantly different between the two groups. However, the data did not meet the assumptions of the tests we used. It likely does not have equal variance, covariance or multivariate normality, all of which are assumptions of MANOVA, ANOVA, and/or the T-Test. It fails tests of univariate normality for several of these variables. This weakens these tests and makes our results less certain.</p>
+<pre class="r"><code># catagorical variables: cbind(job, Region, IncomeGroup)
+shapiro.test(data$HDI)</code></pre>
+<pre><code>## 
+##  Shapiro-Wilk normality test
+## 
+## data:  data$HDI
+## W = 0.93662, p-value = 1.132e-05</code></pre>
+<pre class="r"><code>shapiro.test(data$LifeExpectancy)</code></pre>
+<pre><code>## 
+##  Shapiro-Wilk normality test
+## 
+## data:  data$LifeExpectancy
+## W = 0.92863, p-value = 3.325e-06</code></pre>
+<pre class="r"><code>shapiro.test(data$ExpectedEducation)</code></pre>
+<pre><code>## 
+##  Shapiro-Wilk normality test
+## 
+## data:  data$ExpectedEducation
+## W = 0.98913, p-value = 0.394</code></pre>
+<pre class="r"><code>shapiro.test(data$MeanEducation)</code></pre>
+<pre><code>## 
+##  Shapiro-Wilk normality test
+## 
+## data:  data$MeanEducation
+## W = 0.95005, p-value = 0.0001072</code></pre>
+<pre class="r"><code>shapiro.test(data$HappinessScore)</code></pre>
+<pre><code>## 
+##  Shapiro-Wilk normality test
+## 
+## data:  data$HappinessScore
+## W = 0.97748, p-value = 0.02822</code></pre>
+<pre class="r"><code>print(&quot;******MANOVA******&quot;)</code></pre>
+<pre><code>## [1] &quot;******MANOVA******&quot;</code></pre>
+<pre class="r"><code>awman &lt;- manova(cbind(HDI, LifeExpectancy, ExpectedEducation, 
+    MeanEducation, HappinessScore) ~ FemaLeader, data = data)
+summary(awman)</code></pre>
+<pre><code>##             Df  Pillai approx F num Df den Df   Pr(&gt;F)   
+## FemaLeader   1 0.11829   3.3541      5    125 0.007068 **
+## Residuals  129                                           
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<pre class="r"><code>print(&quot;******ANOVAS******&quot;)</code></pre>
+<pre><code>## [1] &quot;******ANOVAS******&quot;</code></pre>
+<pre class="r"><code>summary.aov(awman)</code></pre>
+<pre><code>##  Response HDI :
+##              Df Sum Sq  Mean Sq F value  Pr(&gt;F)  
+## FemaLeader    1 0.0836 0.083578  3.1971 0.07612 .
+## Residuals   129 3.3723 0.026142                  
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+##  Response LifeExpectancy :
+##              Df Sum Sq Mean Sq F value  Pr(&gt;F)  
+## FemaLeader    1  385.7  385.74  5.1634 0.02472 *
+## Residuals   129 9637.2   74.71                  
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+##  Response ExpectedEducation :
+##              Df  Sum Sq Mean Sq F value Pr(&gt;F)  
+## FemaLeader    1   55.74  55.736  6.4317 0.0124 *
+## Residuals   129 1117.89   8.666                 
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+##  Response MeanEducation :
+##              Df  Sum Sq Mean Sq F value  Pr(&gt;F)  
+## FemaLeader    1   35.27  35.274  3.4177 0.06679 .
+## Residuals   129 1331.41  10.321                  
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+##  Response HappinessScore :
+##              Df  Sum Sq Mean Sq F value Pr(&gt;F)
+## FemaLeader    1   3.137  3.1368  2.3183 0.1303
+## Residuals   129 174.543  1.3530</code></pre>
+<pre class="r"><code>print(&quot;******T-Tests******&quot;)</code></pre>
+<pre><code>## [1] &quot;******T-Tests******&quot;</code></pre>
+<pre class="r"><code>pairwise.t.test(data$LifeExpectancy, data$FemaLeader)</code></pre>
+<pre><code>## 
+##  Pairwise comparisons using t tests with pooled SD 
+## 
+## data:  data$LifeExpectancy and data$FemaLeader 
+## 
+##   0    
+## 1 0.025
+## 
+## P value adjustment method: holm</code></pre>
+<pre class="r"><code>pairwise.t.test(data$ExpectedEducation, data$FemaLeader)</code></pre>
+<pre><code>## 
+##  Pairwise comparisons using t tests with pooled SD 
+## 
+## data:  data$ExpectedEducation and data$FemaLeader 
+## 
+##   0    
+## 1 0.012
+## 
+## P value adjustment method: holm</code></pre>
+<pre class="r"><code>print(&quot;Probability of a Type-1 error:&quot;)</code></pre>
+<pre><code>## [1] &quot;Probability of a Type-1 error:&quot;</code></pre>
+<pre class="r"><code>1 - (0.95^8)</code></pre>
+<pre><code>## [1] 0.3365796</code></pre>
+<pre class="r"><code>print(&quot;Corrected Significance Value:&quot;)</code></pre>
+<pre><code>## [1] &quot;Corrected Significance Value:&quot;</code></pre>
+<pre class="r"><code>0.05/8</code></pre>
+<pre><code>## [1] 0.00625</code></pre>
+<p>I constructed a linear model using LifeExpectancy and the public perception of whether or not a woman can perform a man’s job (job) to predict HappinessScore. I mean centered both LifeExpectancy and HappinessScore for this analysis. When the KS and BP tests are run on the linear model, both fail to reject the null (p &gt; 0.05) meaning the data has a normal distribtution and is homoskedastic.Though the histogram of residuals has a lower value in the middle, the residuals plot shows an even distribution and a fit line is horizontal, meaning the data is linear.</p>
+<p>LifeExpectany is significant (p &lt; 0.05), as is the interaction between LifeExpectany and job (p=0.00104). Because job is not significant (p=0.85619), this is called a cross-over interaction, as seen in the plot, where the slope of the two lines cross. Countries that answered “Yes” (1) to the survey question have, on when LifeExpectancy is constant, a 0.021812 unit lower happiness score. Holding the survey question, job, constant, every additional year of life expectancy is a 0.089720 increase in the happiness score. When the survey question, job, is 1, there is an additional increase of 0.046497 with every additional year of life expectancy. The model with Robust SEs shows the same results. This model is responsible for 69% for the total variation.</p>
+<p>job1 -0.021812 0.120110 -0.182 0.85619<br />
+LifeExpectancyC 0.089720 0.008708 10.303 &lt; 2e-16 ***
+job1:LifeExpectancyC 0.046497</p>
+<p>Assumption Checking Resource: <a href="http://www.sthda.com/english/articles/39-regression-model-diagnostics/161-linear-regression-assumptions-and-diagnostics-in-r-essentials/" class="uri">http://www.sthda.com/english/articles/39-regression-model-diagnostics/161-linear-regression-assumptions-and-diagnostics-in-r-essentials/</a>
+Cross-Over Interaction: <a href="https://www.theanalysisfactor.com/interactions-main-effects-not-significant/" class="uri">https://www.theanalysisfactor.com/interactions-main-effects-not-significant/</a></p>
+<pre class="r"><code>data$HappinessScoreC &lt;- data$HappinessScore - mean(data$HappinessScore, 
+    na.rm = T)
+data$LifeExpectancyC &lt;- data$LifeExpectancy - mean(data$LifeExpectancy, 
+    na.rm = T)
+
+model &lt;- lm(HappinessScoreC ~ job * LifeExpectancyC, data = data)
+
+# Linear Relationship: Scatter Plot
+ggplot(data, aes(x = LifeExpectancyC, y = HappinessScoreC, color = job)) + 
+    geom_point() + theme_classic()</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-7-1.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code># Independent Observations Normal Distribution: Histogram, KS
+# or SW test
+resids &lt;- model$residuals
+ggplot() + geom_histogram(aes(resids), bins = 10) + theme_classic()</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-7-2.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>ks.test(resids, &quot;pnorm&quot;, mean = 0, sd(resids))</code></pre>
+<pre><code>## 
+##  One-sample Kolmogorov-Smirnov test
+## 
+## data:  resids
+## D = 0.079023, p-value = 0.3866
+## alternative hypothesis: two-sided</code></pre>
+<pre class="r"><code># Equal Variance (homoskedasticity): residuals vs y-hat and
+# bp test
+fitvals &lt;- model$fitted.values
+ggplot() + geom_point(aes(fitvals, resids)) + theme_classic() + 
+    geom_hline(yintercept = 0, color = &quot;red&quot;)</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-7-3.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>bptest(model)</code></pre>
+<pre><code>## 
+##  studentized Breusch-Pagan test
+## 
+## data:  model
+## BP = 0.49715, df = 3, p-value = 0.9195</code></pre>
+<pre class="r"><code>summary(model)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HappinessScoreC ~ job * LifeExpectancyC, data = data)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -1.5251 -0.4466  0.0411  0.5198  1.4017 
+## 
+## Coefficients:
+##                       Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)          -0.036687   0.077661  -0.472  0.63745    
+## job1                 -0.021812   0.120110  -0.182  0.85619    
+## LifeExpectancyC       0.089720   0.008708  10.303  &lt; 2e-16 ***
+## job1:LifeExpectancyC  0.046497   0.013845   3.358  0.00104 ** 
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 0.6598 on 127 degrees of freedom
+## Multiple R-squared:  0.6888, Adjusted R-squared:  0.6815 
+## F-statistic: 93.71 on 3 and 127 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>ggplot(aes(x = LifeExpectancyC, y = HappinessScoreC, group = job), 
+    data = data) + geom_point(aes(color = job)) + geom_smooth(method = &quot;lm&quot;, 
+    se = F, fullrange = T, aes(color = job)) + theme_classic() + 
+    ylab(&quot;Centered Happiness Score&quot;) + xlab(&quot;Centered Life Expectancy&quot;) + 
+    ggtitle(&quot;Using Different Countrys&#39;s Life Expectancy to Predict Happiness&quot;, 
+        subtitle = &quot;Seperated by Social Perception of Women&#39;s Ability to Perform the Same Job as Men&quot;) + 
+    theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) + 
+    NULL</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-7-4.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>coeftest(model, vcov = vcovHC(model))</code></pre>
+<pre><code>## 
+## t test of coefficients:
+## 
+##                       Estimate Std. Error t value  Pr(&gt;|t|)    
+## (Intercept)          -0.036687   0.076058 -0.4824  0.630383    
+## job1                 -0.021812   0.122814 -0.1776  0.859320    
+## LifeExpectancyC       0.089720   0.009562  9.3830 3.272e-16 ***
+## job1:LifeExpectancyC  0.046497   0.015080  3.0834  0.002511 ** 
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<pre class="r"><code>(sum((data$HappinessScore - mean(data$HappinessScore))^2) - sum(model$residuals^2))/sum((data$HappinessScore - 
+    mean(data$HappinessScore))^2)</code></pre>
+<pre><code>## [1] 0.6888203</code></pre>
+<p>The bootstrapped SE are very simular to that of the normal model, which is to be expected because the data is normal and homoskedastic. A confidence interval that contains 0 mean that “null” is within the confidence limits and therefore cannot be rejected (p&gt;0.05). This is the case for job, but not LifeExpectancy or the interaction of LifeExpectancy and job (p&lt;0.05). This is the same result as with the non-bootstrapped model.</p>
+<pre class="r"><code>summary(model)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = HappinessScoreC ~ job * LifeExpectancyC, data = data)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -1.5251 -0.4466  0.0411  0.5198  1.4017 
+## 
+## Coefficients:
+##                       Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)          -0.036687   0.077661  -0.472  0.63745    
+## job1                 -0.021812   0.120110  -0.182  0.85619    
+## LifeExpectancyC       0.089720   0.008708  10.303  &lt; 2e-16 ***
+## job1:LifeExpectancyC  0.046497   0.013845   3.358  0.00104 ** 
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 0.6598 on 127 degrees of freedom
+## Multiple R-squared:  0.6888, Adjusted R-squared:  0.6815 
+## F-statistic: 93.71 on 3 and 127 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>samp_distn &lt;- replicate(5000, {
+    boot &lt;- sample_frac(data, replace = T)
+    fit &lt;- lm(HappinessScoreC ~ job * LifeExpectancyC, data = boot)
+    coef(fit)
+})
+samp_distn %&gt;% t %&gt;% as.data.frame %&gt;% summarize_all(sd)</code></pre>
+<pre><code>##   (Intercept)      job1 LifeExpectancyC job1:LifeExpectancyC
+## 1   0.0738204 0.1196729     0.009408087           0.01491756</code></pre>
+<pre class="r"><code>samp_distn %&gt;% t %&gt;% as.data.frame %&gt;% gather %&gt;% group_by(key) %&gt;% 
+    summarize(lower = quantile(value, 0.025), upper = quantile(value, 
+        0.975))</code></pre>
+<pre><code>## # A tibble: 4 x 3
+##   key                    lower  upper
+##   &lt;chr&gt;                  &lt;dbl&gt;  &lt;dbl&gt;
+## 1 (Intercept)          -0.187  0.101 
+## 2 job1                 -0.254  0.214 
+## 3 job1:LifeExpectancyC  0.0167 0.0758
+## 4 LifeExpectancyC       0.0718 0.109</code></pre>
+<pre class="r"><code>class_diag &lt;- function(probs, truth) {
+    
+    tab &lt;- table(factor(probs &gt; 0.5, levels = c(&quot;FALSE&quot;, &quot;TRUE&quot;)), 
+        truth)
+    acc = sum(diag(tab))/sum(tab)
+    sens = tab[2, 2]/colSums(tab)[2]
+    spec = tab[1, 1]/colSums(tab)[1]
+    ppv = tab[2, 2]/rowSums(tab)[2]
+    
+    if (is.numeric(truth) == FALSE &amp; is.logical(truth) == FALSE) 
+        truth &lt;- as.numeric(truth) - 1
+    
+    # CALCULATE EXACT AUC
+    ord &lt;- order(probs, decreasing = TRUE)
+    probs &lt;- probs[ord]
+    truth &lt;- truth[ord]
+    
+    TPR = cumsum(truth)/max(1, sum(truth))
+    FPR = cumsum(!truth)/max(1, sum(!truth))
+    
+    dup &lt;- c(probs[-1] &gt;= probs[-length(probs)], FALSE)
+    TPR &lt;- c(0, TPR[!dup], 1)
+    FPR &lt;- c(0, FPR[!dup], 1)
+    
+    n &lt;- length(TPR)
+    auc &lt;- sum(((TPR[-1] + TPR[-n])/2) * (FPR[-1] - FPR[-n]))
+    
+    data.frame(acc, sens, spec, ppv, auc)
+}</code></pre>
+<p>Before cross validation, the model is 0.7099237 accurate; the recall is 0.6944444, sensitivity is 0.7575758, and specificity of this model is 0.6615385. The AUC is 0.7724942. Out of the significant predictors I am reporting them as Variable: X, where X is the increase in log-odds for every one unit increase in the variable, while holding all others constant. The significant predictors (p&lt;0.05) are RegionEurope &amp; Central Asia: -2.175, RegionMiddle East &amp; North Africa: -3.039, HDI: -2.782e+01, LifeExpectancy: 2.438e-01, ExpectedEducation: 5.903e-01, MeanEducation: 0.491960. AUC is a calculation of how well we are predicting our response variable. The AUC demonstrated by the AUC graph is 0.7724942, but, as demonstrated in the large area of overlap in the density plot, the model cannot correctly predict each response. The cross validatated model sees a decress to an AUC of 0.6138492 and an accuracy of 0.5945055. The recall is 0.5754762, the sensitivity is 0.6462698, and the specificity is 0.5497619. This reduction means that the model is overfitting when it consideres every single variable.</p>
+<pre class="r"><code>print(&quot;number of countries with no female leaders (last 50 years):&quot;)</code></pre>
+<pre><code>## [1] &quot;number of countries with no female leaders (last 50 years):&quot;</code></pre>
+<pre class="r"><code>data %&gt;% filter(FemaLeader == 0) %&gt;% count %&gt;% pull</code></pre>
+<pre><code>## [1] 65</code></pre>
+<pre class="r"><code>print(&quot;number of countries with one or more female leaders (last 50 years):&quot;)</code></pre>
+<pre><code>## [1] &quot;number of countries with one or more female leaders (last 50 years):&quot;</code></pre>
+<pre class="r"><code>data %&gt;% filter(FemaLeader == 1) %&gt;% count %&gt;% pull</code></pre>
+<pre><code>## [1] 66</code></pre>
+<pre class="r"><code>glm_data &lt;- data %&gt;% select(-c(&quot;Country&quot;, &quot;Country.Code&quot;, &quot;HappinessScoreC&quot;, 
+    &quot;LifeExpectancyC&quot;)) %&gt;% mutate(FemaLeader = ifelse(FemaLeader == 
+    1, TRUE, FALSE))
+
+fit &lt;- glm(FemaLeader ~ ., data = glm_data, family = &quot;binomial&quot;)
+prob &lt;- predict(fit, glm_data, type = &quot;response&quot;)
+pred &lt;- ifelse(prob &gt; 0.5, 1, 0)
+class_diag(prob, glm_data$FemaLeader)</code></pre>
+<pre><code>##            acc      sens      spec       ppv       auc
+## TRUE 0.7099237 0.7575758 0.6615385 0.6944444 0.7724942</code></pre>
+<pre class="r"><code>summary(fit)</code></pre>
+<pre><code>## 
+## Call:
+## glm(formula = FemaLeader ~ ., family = &quot;binomial&quot;, data = glm_data)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -2.3112  -1.0091   0.1087   0.9307   1.7236  
+## 
+## Coefficients:
+##                                    Estimate Std. Error z value Pr(&gt;|z|)   
+## (Intercept)                       -6.001052   5.462770  -1.099  0.27197   
+## RegionEurope &amp; Central Asia       -2.455524   1.007536  -2.437  0.01480 * 
+## RegionLatin America &amp; Caribbean   -1.689125   1.020262  -1.656  0.09781 . 
+## RegionMiddle East &amp; North Africa  -3.290685   1.216576  -2.705  0.00683 **
+## RegionNorth America               -3.089147   1.798720  -1.717  0.08590 . 
+## RegionSouth Asia                   0.657288   1.253471   0.524  0.60002   
+## RegionSub-Saharan Africa          -0.782192   1.156554  -0.676  0.49884   
+## IncomeGroupLow income             -1.771812   2.015048  -0.879  0.37924   
+## IncomeGroupLower middle income    -1.922387   1.402231  -1.371  0.17039   
+## IncomeGroupUpper middle income    -0.848561   0.801891  -1.058  0.28996   
+## job1                               0.500978   0.479079   1.046  0.29569   
+## HDI                              -28.164969  13.457874  -2.093  0.03636 * 
+## LifeExpectancy                     0.230897   0.091860   2.514  0.01195 * 
+## ExpectedEducation                  0.536227   0.242899   2.208  0.02727 * 
+## MeanEducation                      0.491960   0.244627   2.011  0.04432 * 
+## GNIperCaptia                      -0.001884   0.004124  -0.457  0.64782   
+## HappinessScore                     0.132331   0.398216   0.332  0.73966   
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 181.60  on 130  degrees of freedom
+## Residual deviance: 145.69  on 114  degrees of freedom
+## AIC: 179.69
+## 
+## Number of Fisher Scoring iterations: 5</code></pre>
+<pre class="r"><code>coef(fit) %&gt;% exp %&gt;% data.frame</code></pre>
+<pre><code>##                                             .
+## (Intercept)                      2.476146e-03
+## RegionEurope &amp; Central Asia      8.581821e-02
+## RegionLatin America &amp; Caribbean  1.846811e-01
+## RegionMiddle East &amp; North Africa 3.722835e-02
+## RegionNorth America              4.554078e-02
+## RegionSouth Asia                 1.929552e+00
+## RegionSub-Saharan Africa         4.574021e-01
+## IncomeGroupLow income            1.700246e-01
+## IncomeGroupLower middle income   1.462575e-01
+## IncomeGroupUpper middle income   4.280305e-01
+## job1                             1.650335e+00
+## HDI                              5.862859e-13
+## LifeExpectancy                   1.259730e+00
+## ExpectedEducation                1.709544e+00
+## MeanEducation                    1.635518e+00
+## GNIperCaptia                     9.981178e-01
+## HappinessScore                   1.141486e+00</code></pre>
+<pre class="r"><code>table(predicted = factor(prob &gt; 0.5, levels = c(&quot;FALSE&quot;, &quot;TRUE&quot;)), 
+    actual = glm_data$FemaLeader) %&gt;% addmargins</code></pre>
+<pre><code>##          actual
+## predicted FALSE TRUE Sum
+##     FALSE    43   16  59
+##     TRUE     22   50  72
+##     Sum      65   66 131</code></pre>
+<pre class="r"><code>ROC &lt;- glm_data %&gt;% ggplot() + geom_roc(aes(d = FemaLeader, m = prob), 
+    n.cuts = 0) + geom_segment(aes(x = 0, xend = 1, y = 0, yend = 1), 
+    lty = 2) + theme_bw()
+ROC</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-10-1.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>calc_auc(ROC)</code></pre>
+<pre><code>##   PANEL group       AUC
+## 1     1    -1 0.7724942</code></pre>
+<pre class="r"><code>logit &lt;- predict(fit, type = &quot;link&quot;)
+glm_data %&gt;% ggplot() + geom_density(aes(logit, color = FemaLeader, 
+    fill = FemaLeader), alpha = 0.4) + theme(legend.position = c(0.85, 
+    0.85)) + theme_bw() + geom_vline(xintercept = 0) + xlab(&quot;predictor (logit)&quot;)</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-10-2.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>set.seed(1234)
+k = 10  #number of folds
+glm_data &lt;- glm_data[sample(nrow(glm_data)), ]  #mix up the data to break any patterns between samples
+folds &lt;- cut(seq(1:nrow(glm_data)), breaks = k, labels = F)  #create folds (subsets)
+diags &lt;- NULL  #null vector
+for (i in 1:k) {
+    # inerate through so each fold is &#39;test&#39; at some point
+    train &lt;- glm_data[folds != i, ]  #training data set
+    test &lt;- glm_data[folds == i, ]  #validation data set
+    truth &lt;- test$FemaLeader  #actual labels of the test data
+    fit &lt;- glm(FemaLeader ~ ., data = train, family = &quot;binomial&quot;)  #fit a linear model
+    probs &lt;- predict(fit, newdata = test, type = &quot;response&quot;)  #find probabilities of &#39;True&#39; for each sample in the test data using the linear model
+    diags &lt;- rbind(diags, class_diag(probs, truth))  #stores the model statistics for each ineration
+}
+
+summarize_all(diags, mean)  #mean satitstics of the k-fold model</code></pre>
+<pre><code>##         acc      sens      spec       ppv       auc
+## 1 0.5945055 0.6462698 0.5497619 0.5754762 0.6138492</code></pre>
+<p>None of the variables had non-zero coefficient values from the lasso regression with either lambda.1se or lamda.min as a response.Therefore I used the variables that were found to be significant predictors in the model that considered all variables but no interactions. The model has an AUC of 0.7298368 while the cross-validated model has an AUC of 0.7066667. There is still overfitting but it is much less extreme.The accuracy is 0.648855 and 0.6027473, respectively. This is an improvement on the cross-fit accuracy of 0.5945055 for the linear model that included every variable.</p>
+<p>glmnet reference: <a href="https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html#log" class="uri">https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html#log</a></p>
+<pre class="r"><code>set.seed(1234)
+y &lt;- as.matrix(glm_data$FemaLeader)  #make response matrix
+x &lt;- model.matrix(FemaLeader ~ -1 + ., data = glm_data)[, -1]  #make predictor matrix
+x &lt;- scale(x)  #scale predictors
+
+cv &lt;- cv.glmnet(x, y, family = &quot;binomial&quot;)  #makes a cross validated linear model
+{
+    plot(cv$glmnet.fit, &quot;lambda&quot;, label = TRUE)
+    abline(v = log(cv$lambda.1se))
+    abline(v = log(cv$lambda.min), lty = 2)
+}</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-11-1.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(cv)</code></pre>
+<p><img src="/project2_files/figure-html/unnamed-chunk-11-2.png" width="768" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>lasso &lt;- glmnet(x, y, family = &quot;binomial&quot;, lambda = cv$lambda.min)  #make a penalty based on the lamda function
+coef(lasso)  #returns the reduced model</code></pre>
+<pre><code>## 17 x 1 sparse Matrix of class &quot;dgCMatrix&quot;
+##                                           s0
+## (Intercept)                       0.01269967
+## RegionEurope &amp; Central Asia       .         
+## RegionLatin America &amp; Caribbean   .         
+## RegionMiddle East &amp; North Africa -0.26738613
+## RegionNorth America               .         
+## RegionSouth Asia                  .         
+## RegionSub-Saharan Africa          .         
+## IncomeGroupLow income             .         
+## IncomeGroupLower middle income    .         
+## IncomeGroupUpper middle income    .         
+## job1                              0.10796037
+## HDI                               .         
+## LifeExpectancy                    0.08003200
+## ExpectedEducation                 0.12145440
+## MeanEducation                     .         
+## GNIperCaptia                      .         
+## HappinessScore                    .</code></pre>
+<pre class="r"><code>lasso &lt;- glmnet(x, y, family = &quot;binomial&quot;, lambda = cv$lambda.1se)
+coef(lasso)</code></pre>
+<pre><code>## 17 x 1 sparse Matrix of class &quot;dgCMatrix&quot;
+##                                           s0
+## (Intercept)                       0.01518673
+## RegionEurope &amp; Central Asia       .         
+## RegionLatin America &amp; Caribbean   .         
+## RegionMiddle East &amp; North Africa -0.07494490
+## RegionNorth America               .         
+## RegionSouth Asia                  .         
+## RegionSub-Saharan Africa          .         
+## IncomeGroupLow income             .         
+## IncomeGroupLower middle income    .         
+## IncomeGroupUpper middle income    .         
+## job1                              0.03901480
+## HDI                               .         
+## LifeExpectancy                    .         
+## ExpectedEducation                 0.01349037
+## MeanEducation                     .         
+## GNIperCaptia                      .         
+## HappinessScore                    .</code></pre>
+<pre class="r"><code># he significant predictors (p&lt;0.05) are RegionEurope &amp;
+# Central Asia: -2.175, RegionMiddle East &amp; North Africa:
+# -3.039, HDI: -2.782e+01, LifeExpectancy: 2.438e-01,
+# ExpectedEducation: 5.903e-01
+glm_data2 &lt;- glm_data %&gt;% mutate(R_ECA = ifelse(Region == &quot;Europe &amp; Central Asia&quot;, 
+    1, 0)) %&gt;% mutate(R_MENA = ifelse(Region == &quot;Middle East &amp; North Africa&quot;, 
+    1, 0))
+
+fit2 &lt;- glm(FemaLeader ~ R_ECA + R_MENA + HDI + LifeExpectancy + 
+    ExpectedEducation + MeanEducation, data = glm_data2, family = &quot;binomial&quot;)
+prob2 &lt;- predict(fit2, type = &quot;response&quot;)
+class_diag(prob2, glm_data2$FemaLeader)</code></pre>
+<pre><code>##           acc      sens      spec       ppv       auc
+## TRUE 0.648855 0.7121212 0.5846154 0.6351351 0.7298368</code></pre>
+<pre class="r"><code>table(predicted = factor(prob2 &gt; 0.5, levels = c(&quot;FALSE&quot;, &quot;TRUE&quot;)), 
+    actual = glm_data2$FemaLeader) %&gt;% addmargins</code></pre>
+<pre><code>##          actual
+## predicted FALSE TRUE Sum
+##     FALSE    38   19  57
+##     TRUE     27   47  74
+##     Sum      65   66 131</code></pre>
+<pre class="r"><code>set.seed(1234)
+k = 10  #number of folds
+glm_data2 &lt;- glm_data2[sample(nrow(glm_data)), ]  #mix up the data to break any patterns between samples
+folds &lt;- cut(seq(1:nrow(glm_data2)), breaks = k, labels = F)  #create folds (subsets)
+diags &lt;- NULL  #null vector
+for (i in 1:k) {
+    # inerate through so each fold is &#39;test&#39; at some point
+    train &lt;- glm_data2[folds != i, ]  #training data set
+    test &lt;- glm_data2[folds == i, ]  #validation data set
+    truth &lt;- test$FemaLeader  #actual labels of the test data
+    fit &lt;- glm(FemaLeader ~ R_ECA + R_MENA + HDI + LifeExpectancy + 
+        ExpectedEducation + MeanEducation, data = train, family = &quot;binomial&quot;)  #fit a linear model
+    probs &lt;- predict(fit, newdata = test, type = &quot;response&quot;)  #find probabilities of &#39;True&#39; for each sample in the test data using the linear model
+    diags &lt;- rbind(diags, class_diag(probs, truth))  #stores the model statistics for each ineration
+}
+summarize_all(diags, mean)</code></pre>
+<pre><code>##         acc      sens      spec       ppv       auc
+## 1 0.6258242 0.7381349 0.5692641 0.6229762 0.7173897</code></pre>
