@@ -1,0 +1,94 @@
+---
+title: Python and R
+author: Eleanor Young
+date: '2020-05-15'
+slug: python-and-r
+categories: []
+tags: []
+description: ''
+---
+![image of cards](C:/Users/ELEANOR/Documents/R/SDS348/TestProject3/static/img/cards.png)
+Reticulate is a package that allows Python and R scripts to talk to each other. Objects and and functions can be imported from .py files and used in R. Additionally, cells in a file can be designated to write Python code.
+```{r}
+library(reticulate)
+library(tidyverse)
+```
+Both R and Python are useful tools. I have taken classes in both Python and R, and there are things I prefer to do in one over the other. For instance, I much prefer to define functions and object classes in python. Here, I am making a class called Card. A Card object can be any card you would find in a normal deck. I also define the function Draw, which will return a randomly selected Card object.
+```{python}
+import random
+class Card (object):
+  RANKS = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
+
+  SUITS = ('C', 'D', 'H', 'S')
+
+  # constructor
+  def __init__ (self, rank = 12, suit = 'S'):
+    if (rank in Card.RANKS):
+      self.rank = rank
+    else:
+      self.rank = 12
+
+    if (suit in Card.SUITS):
+      self.suit = suit
+    else:
+      self.suit = 'S'
+
+  # string representation of a Card object
+  def __str__ (self):
+    if (self.rank == 1):
+      rank = 'A'
+    elif (self.rank == 13):
+      rank = 'K'
+    elif (self.rank == 12):
+      rank = 'Q'
+    elif (self.rank == 11):
+      rank = 'J'
+    else:
+      rank = str (self.rank)
+    return rank + self.suit
+
+  # equality tests
+  def __eq__ (self, other):
+    return self.rank == other.rank
+
+  def __ne__ (self, other):
+    return self.rank != other.rank
+
+  def __lt__ (self, other):
+    return self.rank < other.rank
+
+  def __le__ (self, other):
+    return self.rank <= other.rank
+
+  def __gt__ (self, other):
+    return self.rank > other.rank
+
+  def __ge__ (self, other):
+    return self.rank >= other.rank
+
+def draw(num):
+  if num > (13*4) or num < 1:
+    return ("incorrect input")
+  deck = []
+  for i in Card.RANKS:
+    for j in Card.SUITS:
+      deck.append(Card(i, j))
+  drawn = []
+  while num > 0:
+    num = num - 1
+    random.shuffle(deck)
+    drawn.append(deck.pop())
+  return(drawn)
+```
+
+I then call the function I defined in Python and interact with it in some R code. Though this is a very trivial example, I love that I can blend the functionality of R and Python, and do certain tasks in the environment I am more cofortable with. However, this example also shows a limitation to using R and Python in tandem. R does not recognize the Card object type, and can only display their string representation. In Python I would be able to compare these cards, because that method was defined for the Python Card object. In R, the code 'drawn[1] == drawn[2]' returns an error saying 'comparison of these types is not implemented'. 
+
+```{r}
+drawn = py$draw(4)
+print("cards:")
+for (i in drawn) print(i)
+```
+
+R was first built to be a tool of statistical analysis, and I prefer it for that. It's 'dplyr' and 'ggplot' functions also make it my prefered environment for manipulating dataframes and most data visualization. That being said, I would switch back to Python for most machine learning tasks. You can find examples of this in my projects tab. 
+
+Initially, I had wanted to call a Python script that requires user input. I quickly realized that I knew little enough about the reticulate library, and would have to make shiny app as well. I decided that it wouldn't be prudent to do that, condsidering the deadline for this project. However, check this site at the end of summer. If I can sucessfully do all of that I will post it here.

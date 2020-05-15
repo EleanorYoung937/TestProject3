@@ -1,0 +1,19 @@
+---
+title: "Black Jack"
+author: "Eleanor Young"
+date: "5/14/2020"
+output: html_document
+---
+I wrote BlackJack.py in CS313e with Diya Bhat.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(reticulate)
+```
+
+
+```{r}
+
+```

@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Blogs on Eleanor&#39;s Portfolio</title>
-    <link>/blog/</link>
-    <description>Recent content in Blogs on Eleanor&#39;s Portfolio</description>
+    <title>Posts on Eleanor&#39;s Portfolio</title>
+    <link>/post/</link>
+    <description>Recent content in Posts on Eleanor&#39;s Portfolio</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-US</language>
     <lastBuildDate>Fri, 15 May 2020 00:00:00 +0000</lastBuildDate>
     
-	<atom:link href="/blog/index.xml" rel="self" type="application/rss+xml" />
+	<atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
       <title>Python and R</title>
-      <link>/blog/python-and-r/</link>
+      <link>/2020/05/15/python-and-r/</link>
       <pubDate>Fri, 15 May 2020 00:00:00 +0000</pubDate>
       
-      <guid>/blog/python-and-r/</guid>
+      <guid>/2020/05/15/python-and-r/</guid>
       <description>Reticulate is a package that allows Python and R scripts to talk to each other. Objects and and functions can be imported from .py files and used in R. Additionally, cells in a file can be designated to write Python code.
 library(reticulate)## Warning: package &amp;#39;reticulate&amp;#39; was built under R version 3.6.3library(tidyverse)## -- Attaching packages ------------------------------------------------------------------ tidyverse 1.3.0 --## v ggplot2 3.2.1 v purrr 0.3.3## v tibble 2.</description>
     </item>
