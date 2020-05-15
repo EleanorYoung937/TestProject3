@@ -7,7 +7,7 @@ categories: []
 tags: []
 description: ''
 ---
-![image of cards](static/img/cards.png)
+![image of cards](static/blog/cards.png)
 Reticulate is a package that allows Python and R scripts to talk to each other. Objects and and functions can be imported from .py files and used in R. Additionally, cells in a file can be designated to write Python code.
 ```{r}
 library(reticulate)
