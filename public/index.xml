@@ -18,7 +18,7 @@
       
       <guid>/blog/python-and-r/</guid>
       <description>Reticulate is a package that allows Python and R scripts to talk to each other. Objects and and functions can be imported from .py files and used in R. Additionally, cells in a file can be designated to write Python code.
-library(reticulate)## Warning: package &amp;#39;reticulate&amp;#39; was built under R version 3.6.3library(tidyverse)## -- Attaching packages ------------------------------------------------------------------ tidyverse 1.3.0 --## v ggplot2 3.2.1 v purrr 0.3.3## v tibble 2.</description>
+library(reticulate)## Warning: package &amp;#39;reticulate&amp;#39; was built under R version 3.6.3library(tidyverse)## -- Attaching packages ----------------------------------------------------------------- tidyverse 1.3.0 --## v ggplot2 3.2.1 v purrr 0.3.3## v tibble 2.</description>
     </item>
     
     <item>
